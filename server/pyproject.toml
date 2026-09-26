@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mini-jarvis"
-version = "0.2.0"
+version = "0.2.1"
 description = "Lokaler Sprachassistent auf Basis von Pipecat"
 requires-python = ">=3.11"
 dependencies = [
@@ -21,7 +21,6 @@ dependencies = [
 [project.optional-dependencies]
 gpu = [
   "pipecat-ai[whisper,piper]==1.12.*",
-  "openwakeword>=0.6",
   "sentence-transformers>=3",
 ]
 cloud = ["pipecat-ai[anthropic,openai,jev]==1.12.*"]

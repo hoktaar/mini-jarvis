@@ -25,10 +25,12 @@ RUN groupadd -r jarvis && useradd -r -g jarvis -d /opt/jarvis jarvis \
 RUN curl -fsSL https://ollama.com/install.sh | sh
 
 # SearXNG (nur localhost) + SearXNG-MCP-Server
+# SearXNG braucht seine Requirements VOR dem Editable-Install (setup.py importiert searx).
 RUN git clone --depth 1 https://github.com/searxng/searxng.git /opt/searxng \
  && python3 -m venv /opt/searxng-venv \
- && /opt/searxng-venv/bin/pip install --no-cache-dir -U pip setuptools wheel pyyaml \
- && /opt/searxng-venv/bin/pip install --no-cache-dir -e /opt/searxng
+ && /opt/searxng-venv/bin/pip install --no-cache-dir -U pip setuptools wheel \
+ && /opt/searxng-venv/bin/pip install --no-cache-dir -r /opt/searxng/requirements.txt \
+ && /opt/searxng-venv/bin/pip install --no-cache-dir --use-pep517 --no-build-isolation -e /opt/searxng
 COPY docker/searxng-settings.yml /etc/searxng/settings.yml
 
 # Jarvis-Core
@@ -36,8 +38,14 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 COPY server /opt/jarvis/server
 COPY config/examples /opt/jarvis/config/examples
+# torch nur als CPU-Variante (Router-Embeddings laufen auf der CPU) – spart mehrere GB.
+# Whisper nutzt CTranslate2 mit den CUDA-Bibliotheken des Basis-Images.
+# openWakeWord ohne tflite-runtime (gibt es nicht für Python 3.12), wir nutzen ONNX.
 RUN pip install --no-cache-dir -U pip \
- && pip install --no-cache-dir "/opt/jarvis/server[gpu,cloud]" searxng-mcp-server
+ && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+ && pip install --no-cache-dir "/opt/jarvis/server[gpu,cloud]" searxng-mcp-server \
+ && pip install --no-cache-dir --no-deps openwakeword==0.6.0 \
+ && pip install --no-cache-dir onnxruntime scipy scikit-learn tqdm requests
 
 COPY docker/supervisord.conf /etc/supervisor/conf.d/jarvis.conf
 COPY docker/haproxy.cfg /etc/haproxy/haproxy.cfg

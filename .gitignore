@@ -11,3 +11,4 @@ models/
 firmware/cyd/.vscode/
 *.log
 .env
+server/build/

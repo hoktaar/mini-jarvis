@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 – Image-Build
+
+- SearXNG-Installation im Dockerfile korrigiert (Requirements vor Editable-Install).
+- torch als CPU-Variante, openWakeWord 0.6 ohne tflite (Python 3.12) – Image deutlich kleiner.
+- CI: Speicherplatz auf dem Runner freimachen, Buildx einrichten.
+
 ## 0.2.0 – Phase 1 (Kern)
 
 - Sprachweg Ende-zu-Ende getestet: simulierter CYD und PWA im Browser mit Mikrofon.
