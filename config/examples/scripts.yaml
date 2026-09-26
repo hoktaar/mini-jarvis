@@ -1,0 +1,20 @@
+# Registry der Skripte, die Jarvis ausführen darf.
+scripts:
+  backup_appdata:
+    path: /scripts/backup_appdata.sh
+    description: "Startet das Appdata-Backup auf dem Server."
+    confirm: true
+    car_allowed: false
+    timeout: 600
+    params: {}
+  say_hello:
+    path: /scripts/say_hello.sh
+    description: "Testskript: gibt einen Gruß mit Namen aus."
+    confirm: false
+    car_allowed: true
+    timeout: 10
+    params:
+      name:
+        type: str
+        pattern: "^[A-Za-zÄÖÜäöüß ]{1,30}$"
+        required: true

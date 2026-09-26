@@ -1,0 +1,5 @@
+# Container, die Jarvis sehen/steuern darf, und welche Aktionen.
+containers:
+  jellyfin: [status, start, stop, restart]
+  nextcloud: [status, restart]
+  comfyui: [status, start, stop]

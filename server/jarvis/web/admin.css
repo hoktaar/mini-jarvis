@@ -1,0 +1,11 @@
+.admin { display: block; max-width: 60rem; }
+.admin section { margin: 1.5rem 0; overflow-x: auto; }
+.admin h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
+.field { display: grid; gap: .35rem; max-width: 26rem; }
+.admin input, .admin select { font: inherit; padding: .55rem .7rem; border-radius: .5rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.row { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
+.notice { background: var(--surface); border: 1px solid var(--reactor); border-radius: .6rem; padding: .75rem; word-break: break-all; }
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+td button { padding: .3rem .6rem; }

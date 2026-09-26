@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>mini-jarvis</Name>
+  <Repository>ghcr.io/hoktaar/mini-jarvis:latest</Repository>
+  <Registry>https://github.com/hoktaar/mini-jarvis/pkgs/container/mini-jarvis</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/hoktaar/mini-jarvis/issues</Support>
+  <Project>https://github.com/hoktaar/mini-jarvis</Project>
+  <Overview>Mini-Jarvis: lokaler, deutschsprachiger Sprachassistent (Pipecat, Whisper, Ollama, Piper) für ESP32-Satelliten, PWA, Android und mehr.</Overview>
+  <Category>Tools: HomeAutomation: AI:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/server/jarvis/web/icon.svg</Icon>
+  <ExtraParams>--runtime=nvidia</ExtraParams>
+  <Config Name="Web-UI und Geräte" Target="8080" Default="8080" Mode="tcp" Type="Port" Display="always" Required="true">8080</Config>
+  <Config Name="Konfiguration" Target="/config" Default="/mnt/user/appdata/mini-jarvis/config" Mode="rw" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/config</Config>
+  <Config Name="Daten" Target="/data" Default="/mnt/user/appdata/mini-jarvis/data" Mode="rw" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/data</Config>
+  <Config Name="Modelle (Cache-Pool empfohlen)" Target="/models" Default="/mnt/cache/appdata/mini-jarvis/models" Mode="rw" Type="Path" Display="always" Required="true">/mnt/cache/appdata/mini-jarvis/models</Config>
+  <Config Name="Skripte (read-only)" Target="/scripts" Default="/mnt/user/appdata/mini-jarvis/scripts" Mode="ro" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/scripts</Config>
+  <Config Name="Docker-Socket (nur für den Filter-Proxy)" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="rw" Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
+  <Config Name="NVIDIA_VISIBLE_DEVICES" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Type="Variable" Display="advanced" Required="true">all</Config>
+  <Config Name="NVIDIA_DRIVER_CAPABILITIES" Target="NVIDIA_DRIVER_CAPABILITIES" Default="all" Mode="" Type="Variable" Display="advanced" Required="true">all</Config>
+  <Config Name="Anthropic API-Key (optional)" Target="JARVIS_ANTHROPIC_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="OpenAI API-Key (optional)" Target="JARVIS_OPENAI_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>

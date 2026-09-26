@@ -1,0 +1,103 @@
+# Mini-Jarvis Hauptkonfiguration
+server:
+  host: 0.0.0.0
+  web_port: 8080          # PWA, REST, Admin
+  ws_port: 8080           # WebSockets laufen über denselben Port wie die Web-UI
+  public_base_url: ""     # z. B. https://jarvis.example.lan (für PWA/HTTPS)
+
+language: de
+location:                 # Standard für Wetter
+  name: "Zuhause"
+  latitude: 0.0
+  longitude: 0.0
+  timezone: "Europe/Berlin"
+
+persona: |
+  Du bist Jarvis, ein höflicher, knapper und leicht trockener Assistent.
+  Antworte auf Deutsch in kurzen, gesprochenen Sätzen ohne Markdown.
+  Wenn du ein Werkzeug benutzt, sag kurz, was du getan hast.
+
+gpu:
+  comfyui_mode: false     # true: Whisper auf CPU, Ollama entlädt schnell
+
+audio:
+  sample_rate: 16000
+  wake_word:
+    enabled: true
+    model: hey_jarvis
+    threshold: 0.5
+    listen_seconds: 8     # so lange nach dem Wake-Word zuhören
+
+providers:
+  stt:
+    type: whisper         # whisper | deepgram | openai
+    model: large-v3-turbo
+    device: cuda          # cuda | cpu
+    compute_type: int8_float16
+  tts:
+    type: piper           # piper | elevenlabs | cartesia | openai
+    voice: de_DE-thorsten-high
+  llm:
+    local:
+      type: ollama
+      base_url: http://127.0.0.1:11434/v1
+      model: qwen3:8b
+      keep_alive: 10m
+    cloud:                # optional – leer lassen für rein lokal
+      enabled: false
+      type: anthropic     # anthropic | openai | openrouter | openai_compatible
+      model: ""
+      base_url: ""        # nur für openai_compatible/openrouter
+      escalation: manual  # manual | auto
+      failover: true      # bei Ausfall des lokalen LLM
+      budget_eur_day: 1.0
+      budget_eur_month: 15.0
+      allowed_tool_risks: [read, write]   # critical bleibt lokal
+  classifier:
+    type: local           # local | jev | llm
+
+router:
+  enabled: true
+  thresholds:
+    fast: 0.85
+    focused: 0.5
+  confirm_threshold: 0.9
+  per_intent: {}          # z. B. weather: {fast: 0.8}
+  embedding_model: intfloat/multilingual-e5-small
+
+mcp_servers:
+  - name: searxng
+    enabled: true
+    transport: stdio
+    command: searxng-mcp-server   # PyPI-Paket searxng-mcp-server
+    env:
+      SEARXNG_URL: http://127.0.0.1:8888
+    risk: read
+    taint: true
+  - name: docker
+    enabled: true
+    transport: stdio
+    command: python
+    args: ["-m", "jarvis.mcp_servers.docker_mcp"]
+    risk: mixed           # Status = read, Aktionen = critical (im Server festgelegt)
+
+news:
+  feeds:
+    - name: Tagesschau
+      url: https://www.tagesschau.de/xml/rss2/
+  max_items: 5
+
+push:
+  ntfy:
+    enabled: false
+    base_url: http://127.0.0.1:2586
+
+adapters:
+  matrix:
+    enabled: false
+    homeserver: ""
+    user_id: ""
+    allowed_users: []
+  telegram:
+    enabled: false
+    allowed_user_ids: []

@@ -1,0 +1,130 @@
+# Absichten für den System-1-Router.
+# risk: read | write | critical   fast: darf der Schnellweg das Tool direkt ausführen?
+intents:
+  time_now:
+    tool: get_time
+    risk: read
+    fast: true
+    examples:
+      - Wie spät ist es?
+      - Wie viel Uhr haben wir?
+      - Welcher Tag ist heute?
+      - Welches Datum haben wir?
+      - Sag mir die Uhrzeit
+  timer_set:
+    tool: set_timer
+    risk: write
+    fast: true
+    slots: [duration]
+    ask: "Wie lange soll der Timer laufen?"
+    examples:
+      - Stell einen Timer auf fünf Minuten
+      - Timer zehn Minuten
+      - Erinnere mich in zwanzig Minuten
+      - Starte einen Timer für eine halbe Stunde
+      - Timer auf 3 Minuten für die Eier
+  timer_list:
+    tool: list_timers
+    risk: read
+    fast: true
+    examples:
+      - Welche Timer laufen?
+      - Wie lange läuft der Timer noch?
+      - Zeig mir meine Timer
+  timer_cancel:
+    tool: cancel_timer
+    risk: write
+    fast: true
+    examples:
+      - Lösch den Timer
+      - Timer abbrechen
+      - Stopp den Timer
+  alarm_set:
+    tool: set_alarm
+    risk: write
+    fast: true
+    slots: [datetime]
+    ask: "Wann soll ich dich wecken?"
+    examples:
+      - Weck mich morgen um sieben
+      - Stell einen Wecker auf 6 Uhr 30
+      - Wecker für Montag um acht
+  reminder_set:
+    tool: set_reminder
+    risk: write
+    fast: false            # braucht meist einen Text → LLM
+    slots: [datetime, text]
+    examples:
+      - Erinnere mich morgen um zehn an den Zahnarzt
+      - Erinnerung heute Abend Müll rausbringen
+  weather:
+    tool: get_weather
+    risk: read
+    fast: true
+    examples:
+      - Wie wird das Wetter morgen?
+      - Regnet es heute?
+      - Wie warm ist es draußen?
+      - Brauche ich einen Schirm?
+  news:
+    tool: get_news
+    risk: read
+    fast: false
+    examples:
+      - Was gibt es Neues?
+      - Die aktuellen Nachrichten bitte
+      - Was ist heute in der Welt passiert?
+  web_search:
+    tool: web_search
+    risk: read
+    fast: false
+    examples:
+      - Such im Internet nach
+      - Recherchiere mal
+      - Finde heraus wer
+  docker_status:
+    tool: container_status
+    risk: read
+    fast: true
+    slots: [name]
+    ask: "Welchen Container meinst du?"
+    examples:
+      - Läuft Jellyfin?
+      - Wie ist der Status der Container?
+      - Ist der Plex Container online?
+  docker_action:
+    tool: container_action
+    risk: critical
+    fast: true             # sicher: die Policy verlangt trotzdem eine Bestätigung
+    slots: [name, action]
+    ask: "Welchen Container meinst du, und was soll ich tun?"
+    examples:
+      - Starte den Jellyfin Container neu
+      - Stopp Container Plex
+      - Starte Nextcloud
+  run_script:
+    tool: run_script
+    risk: critical
+    fast: false
+    examples:
+      - Führe das Backup Skript aus
+      - Starte das Skript
+  stop:
+    tool: stop
+    risk: read
+    fast: true
+    examples:
+      - Stopp
+      - Hör auf
+      - Ruhe
+      - Abbrechen
+  chat:
+    tool: null
+    risk: read
+    fast: false
+    examples:
+      - Erzähl mir einen Witz
+      - Was hältst du von
+      - Erklär mir
+      - Wie geht es dir?
+      - Wer war Albert Einstein?

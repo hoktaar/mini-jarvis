@@ -1,0 +1,17 @@
+# Zum Testen außerhalb von Unraid (Docker + NVIDIA Container Toolkit)
+services:
+  mini-jarvis:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    image: mini-jarvis:dev
+    ports: ["8080:8080"]
+    volumes:
+      - ./data/config:/config
+      - ./data/data:/data
+      - ./data/models:/models
+      - ./scripts:/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+    restart: unless-stopped

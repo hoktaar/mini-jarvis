@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jarvis – Verwaltung</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <main class="admin">
+    <header class="bar"><h1>Verwaltung</h1><a href="/" class="link">Zurück zu Jarvis</a></header>
+    <section>
+      <label class="field">Admin-Token <input id="admin-token" type="password" placeholder="aus /config/secrets.yaml"></label>
+    </section>
+    <section>
+      <h2>Geräte</h2>
+      <form id="new-device" class="row">
+        <input id="dev-name" placeholder="Name, z. B. Küche" required>
+        <select id="dev-kind">
+          <option value="cyd">CYD</option><option value="esp32">ESP32</option><option value="pwa">Browser / PWA</option>
+          <option value="android">Android</option><option value="android_auto">Android Auto</option>
+          <option value="desktop">Desktop</option><option value="matrix">Matrix</option><option value="telegram">Telegram</option>
+        </select>
+        <input id="dev-room" placeholder="Raum (optional)">
+        <button>Gerät anlegen</button>
+      </form>
+      <p id="notice" class="notice" hidden></p>
+      <table><thead><tr><th>Name</th><th>Typ</th><th>Raum</th><th>Status</th><th></th></tr></thead><tbody id="devices"></tbody></table>
+    </section>
+    <section>
+      <h2>Router-Entscheidungen</h2>
+      <table><thead><tr><th>Satz</th><th>Absicht</th><th>Sicherheit</th><th>Weg</th></tr></thead><tbody id="router"></tbody></table>
+    </section>
+    <section>
+      <h2>Aktionsprotokoll</h2>
+      <table><thead><tr><th>Zeit</th><th>Wer</th><th>Aktion</th><th>Ergebnis</th></tr></thead><tbody id="audit"></tbody></table>
+    </section>
+  </main>
+  <script src="admin.js" type="module"></script>
+</body>
+</html>
