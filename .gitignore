@@ -5,8 +5,8 @@ __pycache__/
 .pytest_cache/
 config/*.yaml
 !config/examples/*.yaml
-data/
-models/
+/data/
+/models/
 .pio/
 firmware/cyd/.vscode/
 *.log
@@ -15,3 +15,4 @@ server/build/
 firmware/cyd/dist/
 firmware/cyd/tools/preview/preview
 *.ppm
+.ruff_cache/
