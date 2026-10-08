@@ -5,6 +5,7 @@ import json
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from wsutil import disconnect
 
 import jarvis.main as main
 from jarvis.config import HomeAssistantCfg
@@ -166,4 +167,5 @@ def test_cyd_home_pages_and_clock(client, services, ha):
                 break
         else:
             raise AssertionError("keine Fehlermeldung für nicht schaltbare Entität")
+        disconnect(ws, services)
     assert ha[1].calls == []

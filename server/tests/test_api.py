@@ -4,6 +4,7 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from wsutil import disconnect
 
 import jarvis.main as main
 
@@ -98,7 +99,7 @@ def test_firmware_upload_and_download(client, admin, services):
     assert bad.status_code == 400
 
 
-def test_cyd_websocket_text_and_events(client, admin):
+def test_cyd_websocket_text_and_events(client, admin, services):
     data = client.post("/api/admin/devices", json={"name": "Küche", "kind": "cyd"}, headers=admin).json()
     headers = {"Authorization": f"Bearer {data['token']}"}
     with client.websocket_connect("/ws/cyd", headers=headers) as ws:
@@ -110,6 +111,7 @@ def test_cyd_websocket_text_and_events(client, admin):
             seen = {e["type"] for e in events}
             if {"turn_done", "timers", "volume"} <= seen:
                 break
+        disconnect(ws, services)
     types = [e["type"] for e in events]
     assert "timers" in types and "private" in types and "volume" in types
     answer = next(e for e in events if e["type"] == "text" and e["role"] == "assistant")
@@ -124,8 +126,9 @@ def test_ws_rejects_without_token(client):
     assert e.value.code == 4401
 
 
-def test_legacy_query_token_still_works(client, admin):
+def test_legacy_query_token_still_works(client, admin, services):
     data = client.post("/api/admin/devices", json={"name": "Alt", "kind": "cyd"}, headers=admin).json()
     with client.websocket_connect(f"/ws/cyd?token={data['token']}") as ws:
         first = json.loads(ws.receive_text())
+        disconnect(ws, services)
     assert first["type"] in ("hello", "private", "timers", "volume", "state")
