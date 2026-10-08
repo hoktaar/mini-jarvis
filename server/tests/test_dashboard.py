@@ -137,3 +137,33 @@ def test_dashboard_with_home_assistant(client, device, services, ha):
     assert client.post("/api/home/light.nicht_freigegeben/toggle", headers=device).status_code == 403
     feed = client.get("/api/dashboard", headers=device).json()["feed"]
     assert any(f["text"].startswith("Licht Wohnzimmer geschaltet") for f in feed)
+
+
+def test_cyd_home_pages_and_clock(client, services, ha):
+    services.home = ha[0]
+    admin = {"X-Admin-Token": services.secrets["admin_token"]}
+    data = client.post("/api/admin/devices", json={"name": "Flur", "kind": "cyd"}, headers=admin).json()
+    assert data["provision"]["tz"] == "CET-1CEST,M3.5.0,M10.5.0/3" and data["provision"]["name"] == "Flur"
+    info = client.get("/api/admin/provision-info", headers=admin).json()
+    assert info["port"] == 8080 and "localhost" not in info["hosts"]
+    with client.websocket_connect("/ws/cyd", headers={"Authorization": f"Bearer {data['token']}"}) as ws:
+        ws.send_text(json.dumps({"type": "home_list", "group": "light"}))
+        hello, home = None, None
+        for _ in range(30):
+            msg = json.loads(ws.receive_text())
+            hello = msg if msg["type"] == "hello" else hello
+            home = msg if msg["type"] == "home" else home
+            if hello and home:
+                break
+        assert hello["tz"].startswith("CET") and hello["time"] > 0
+        assert [i["id"] for i in home["items"]] == ["light.wohnzimmer", "scene.film", "switch.kaffee"]
+        assert home["items"][0]["kind"] == "toggle" and home["items"][1]["kind"] == "activate"
+        ws.send_text(json.dumps({"type": "home_toggle", "id": "lock.haustuer", "group": "light"}))
+        for _ in range(10):
+            msg = json.loads(ws.receive_text())
+            if msg["type"] == "notice":
+                assert "nicht schalten" in msg["text"]
+                break
+        else:
+            raise AssertionError("keine Fehlermeldung für nicht schaltbare Entität")
+    assert ha[1].calls == []

@@ -1,6 +1,6 @@
 // Service Worker: App-Shell offline, Updates ohne Hängenbleiben, API/WebSocket nie aus dem Cache.
-const VERSION = "jarvis-v4";
-const SHELL = ["/", "/index.html", "/style.css", "/app.js", "/hud.js", "/vendor/pipecat.js", "/manifest.webmanifest",
+const VERSION = "jarvis-v5";
+const SHELL = ["/", "/index.html", "/style.css", "/app.js", "/hud.js", "/ui.js", "/vendor/pipecat.js", "/manifest.webmanifest",
   "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {

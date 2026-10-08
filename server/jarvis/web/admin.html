@@ -2,41 +2,301 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050b16">
+  <meta name="robots" content="noindex">
   <title>Jarvis – Verwaltung</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="admin.css">
 </head>
-<body>
-  <main class="admin">
-    <header class="bar"><h1>Verwaltung</h1><a href="/" class="link">Zurück zu Jarvis</a></header>
-    <section>
-      <label class="field">Admin-Token <input id="admin-token" type="password" placeholder="aus /config/secrets.yaml"></label>
-    </section>
-    <section>
-      <h2>Geräte</h2>
-      <form id="new-device" class="row">
-        <input id="dev-name" placeholder="Name, z. B. Küche" required>
-        <select id="dev-kind">
-          <option value="cyd">CYD</option><option value="esp32">ESP32</option><option value="pwa">Browser / PWA</option>
-          <option value="android">Android</option><option value="android_auto">Android Auto</option>
-          <option value="desktop">Desktop</option><option value="matrix">Matrix</option><option value="telegram">Telegram</option>
-        </select>
-        <input id="dev-room" placeholder="Raum (optional)">
-        <button>Gerät anlegen</button>
-      </form>
-      <p id="notice" class="notice" hidden></p>
-      <table><thead><tr><th>Name</th><th>Typ</th><th>Raum</th><th>Status</th><th></th></tr></thead><tbody id="devices"></tbody></table>
-    </section>
-    <section>
-      <h2>Router-Entscheidungen</h2>
-      <table><thead><tr><th>Satz</th><th>Absicht</th><th>Sicherheit</th><th>Weg</th></tr></thead><tbody id="router"></tbody></table>
-    </section>
-    <section>
-      <h2>Aktionsprotokoll</h2>
-      <table><thead><tr><th>Zeit</th><th>Wer</th><th>Aktion</th><th>Ergebnis</th></tr></thead><tbody id="audit"></tbody></table>
-    </section>
-  </main>
+<body class="admin-body" data-page="overview">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <radialGradient id="g-core" cx="50%" cy="45%" r="55%">
+        <stop offset="0" stop-color="#e8fbff"/><stop offset=".35" stop-color="#7fe4ff"/>
+        <stop offset=".75" stop-color="#1f8fe0"/><stop offset="1" stop-color="#0a3b8f"/>
+      </radialGradient>
+    </defs>
+    <symbol id="i-dash" viewBox="0 0 24 24"><path d="M4 13h7V4H4v9Zm9 7h7v-9h-7v9ZM4 20h7v-5H4v5Zm9-11h7V4h-7v5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-devices" viewBox="0 0 24 24"><rect x="3" y="5" width="12" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 18h6M9 14v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="16" y="8" width="5" height="11" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 3v4m4-4v4m-4 10v4m4-4v4M3 10h4m-4 4h4m10-4h4m-4 4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-brain" viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-1Zm6 0a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m7 9 3 3-3 3m5 0h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 9v4l2.5 2M9 2h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-1.6.9 1.6-1.8 3.1-1.8-.2a7 7 0 0 1-1.6.9L14.4 21h-3.6l-.7-1.7a7 7 0 0 1-1.6-.9l-1.8.2-1.8-3.1.9-1.6a7 7 0 0 1 0-1.8l-.9-1.6 1.8-3.1 1.8.2a7 7 0 0 1 1.6-.9L10.8 3h3.6l.7 1.7a7 7 0 0 1 1.6.9l1.8-.2 1.8 3.1-.9 1.6a7 7 0 0 1 0 1.8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6 9 12l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19L12 4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v4m0 3h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15m0 5v-5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m11 12 8-8m-3 3 2 2m-4 0 1.5 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-usb" viewBox="0 0 24 24"><path d="M12 3v14m0 0a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Zm0-4-5-3V7m5 6 5-3V8m-6.5-3h3L12 3l-1.5 2ZM6 7h2V5H6v2Zm10 1h2V6h-2v2Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0-5 5m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12m0 0-5-5m5 5 5-5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-8A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <!-- ================= Anmeldung ================= -->
+  <div class="login" id="login" hidden>
+    <form class="login-card panel" id="login-form">
+      <svg class="login-mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/><circle cx="20" cy="20" r="12" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3"/><circle cx="20" cy="20" r="6" fill="url(#g-core)"/></svg>
+      <h1>Verwaltung</h1>
+      <p class="muted">Melde dich mit dem Admin-Token an.</p>
+      <label class="field">Admin-Token
+        <input id="login-token" type="password" autocomplete="current-password" required spellcheck="false">
+      </label>
+      <label class="switch"><input type="checkbox" id="login-remember"><span>Auf diesem Gerät merken<small>Nur auf eigenen Geräten verwenden.</small></span></label>
+      <p class="form-error" id="login-error" role="alert" hidden></p>
+      <button class="btn primary big">Anmelden</button>
+      <details class="hint-box">
+        <summary>Wo finde ich den Token?</summary>
+        <p>Er steht in <code>/config/secrets.yaml</code> unter <code>admin_token</code> und wird beim ersten Start automatisch erzeugt.
+          Im Terminal: <code>docker exec jarvis grep admin_token /config/secrets.yaml</code></p>
+      </details>
+      <a class="link" href="/">Zurück zu Jarvis</a>
+    </form>
+  </div>
+
+  <div class="shell" id="app" hidden>
+    <!-- ================= Seitenleiste ================= -->
+    <aside class="sidebar" aria-label="Verwaltung">
+      <a class="logo" href="/" aria-label="Zurück zu Jarvis">
+        <svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/><circle cx="20" cy="20" r="12" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3"/><circle cx="20" cy="20" r="6" fill="url(#g-core)"/></svg>
+        <div><b>JARVIS</b><small>Verwaltung</small></div>
+      </a>
+      <nav class="nav" id="nav">
+        <button data-page="overview" title="Übersicht"><svg><use href="#i-dash"/></svg><span>Übersicht</span></button>
+        <button data-page="devices" title="Geräte"><svg><use href="#i-devices"/></svg><span>Geräte</span></button>
+        <button data-page="firmware" title="Firmware"><svg><use href="#i-chip"/></svg><span>Firmware</span></button>
+        <button data-page="router" title="Router"><svg><use href="#i-route"/></svg><span>Router</span></button>
+        <button data-page="memory" title="Gedächtnis"><svg><use href="#i-brain"/></svg><span>Gedächtnis</span></button>
+        <button data-page="scripts" title="Skripte"><svg><use href="#i-terminal"/></svg><span>Skripte</span></button>
+        <button data-page="timers" title="Timer &amp; Wecker"><svg><use href="#i-timer"/></svg><span>Timer &amp; Wecker</span></button>
+        <button data-page="audit" title="Protokoll"><svg><use href="#i-list"/></svg><span>Protokoll</span></button>
+        <button data-page="system" title="System"><svg><use href="#i-settings"/></svg><span>System</span></button>
+      </nav>
+      <div class="side-foot">
+        <div class="online-card" id="srv-card" data-state="offline">
+          <span class="dot"></span><div><b id="srv-title">Server</b><small id="srv-detail">–</small></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ================= Kopfzeile ================= -->
+    <header class="topbar">
+      <div class="page-title"><h1 id="page-title">Übersicht</h1><small id="page-sub"></small></div>
+      <div class="top-actions">
+        <button class="icon-btn" id="refresh" title="Aktualisieren" aria-label="Aktualisieren"><svg><use href="#i-refresh"/></svg></button>
+        <button class="icon-btn" id="theme" title="Hell/Dunkel" aria-label="Hell oder dunkel"><svg><use href="#i-sun"/></svg></button>
+        <a class="btn ghost small" href="/"><svg><use href="#i-back"/></svg><span>Zu Jarvis</span></a>
+        <button class="icon-btn" id="logout" title="Abmelden" aria-label="Abmelden"><svg><use href="#i-logout"/></svg></button>
+      </div>
+    </header>
+    <div class="banners" id="banners"></div>
+
+    <main class="admin-main" id="main">
+      <!-- ---------- Übersicht ---------- -->
+      <section class="page" data-page="overview">
+        <div class="kpi-row" id="ov-kpis"></div>
+        <div class="cards">
+          <section class="panel">
+            <header><h2><svg><use href="#i-check"/></svg>Dienste</h2></header>
+            <ul class="rows" id="ov-checks"></ul>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-cloud"/></svg>KI-Anbieter</h2><span class="status-tag" id="ov-cloud-tag"></span></header>
+            <dl class="defs" id="ov-providers"></dl>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-timer"/></svg>Antwortzeiten</h2><small>Median · 90 % · zuletzt</small></header>
+            <div id="ov-latency"></div>
+          </section>
+          <section class="panel" id="ov-budget-panel" hidden>
+            <header><h2><svg><use href="#i-cloud"/></svg>Cloud-Budget</h2></header>
+            <div class="meters" id="ov-budget"></div>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-warn"/></svg>Hinweise</h2></header>
+            <ul class="rows" id="ov-warnings"></ul>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-lock"/></svg>HTTPS &amp; Zertifikat</h2></header>
+            <div id="ov-https"></div>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-devices"/></svg>Aktive Sitzungen</h2></header>
+            <ul class="rows" id="ov-sessions"></ul>
+          </section>
+        </div>
+      </section>
+
+      <!-- ---------- Geräte ---------- -->
+      <section class="page" data-page="devices" hidden>
+        <section class="panel">
+          <header><h2><svg><use href="#i-new"/></svg>Neues Gerät</h2></header>
+          <form class="form-row" id="dev-form">
+            <label class="field">Name<input id="dev-name" required maxlength="60" placeholder="z. B. Küche"></label>
+            <label class="field">Typ
+              <select id="dev-kind">
+                <option value="pwa">Browser / Handy (PWA)</option>
+                <option value="cyd">CYD-Display (ESP32)</option>
+                <option value="esp32">ESP32-Satellit</option>
+                <option value="android">Android</option>
+                <option value="android_auto">Android Auto</option>
+                <option value="desktop">Desktop</option>
+                <option value="telegram">Telegram</option>
+                <option value="matrix">Matrix</option>
+              </select>
+            </label>
+            <label class="field">Raum<input id="dev-room" maxlength="40" placeholder="optional"></label>
+            <button class="btn primary"><svg><use href="#i-new"/></svg>Anlegen</button>
+          </form>
+          <p class="muted small" id="dev-kind-hint"></p>
+        </section>
+        <div class="device-grid" id="dev-list"></div>
+      </section>
+
+      <!-- ---------- Firmware ---------- -->
+      <section class="page" data-page="firmware" hidden>
+        <div class="cards wide-first">
+          <section class="panel flasher" id="flasher">
+            <header><h2><svg><use href="#i-usb"/></svg>CYD per USB einrichten</h2><span class="status-tag" id="fl-support"></span></header>
+            <ol class="stepper" id="fl-steps">
+              <li data-step="1">Gerät</li><li data-step="2">WLAN</li><li data-step="3">Flashen</li><li data-step="4">Einrichten</li><li data-step="5">Fertig</li>
+            </ol>
+            <div class="fl-body" id="fl-body"></div>
+            <details class="log-box" id="fl-log-box"><summary>Protokoll</summary><pre id="fl-log"></pre></details>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-chip"/></svg>Verfügbare Firmware</h2><span class="status-tag" id="fw-auto"></span></header>
+            <ul class="rows" id="fw-variants"></ul>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-upload"/></svg>Eigenen Build hochladen</h2></header>
+            <form class="stack" id="fw-upload">
+              <label class="field">Variante
+                <select id="fw-up-variant"><option value="cyd">cyd – CYD mit ILI9341</option><option value="cyd-st7789">cyd-st7789 – CYD2USB mit ST7789</option></select>
+              </label>
+              <label class="field">firmware.bin<input type="file" id="fw-up-file" accept=".bin,application/octet-stream" required></label>
+              <label class="field">Version <input id="fw-up-version" placeholder="leer = aus der Datei lesen" maxlength="32"></label>
+              <button class="btn"><svg><use href="#i-upload"/></svg>Hochladen</button>
+              <p class="muted small">Für OTA-Updates genügt das App-Image (<code>.pio/build/cyd/firmware.bin</code>). Bootloader und Partitionen kommen vom eingebauten Build.</p>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <!-- ---------- Router ---------- -->
+      <section class="page" data-page="router" hidden>
+        <div class="cards">
+          <section class="panel">
+            <header><h2><svg><use href="#i-route"/></svg>Satz testen</h2></header>
+            <form class="form-row" id="rt-form">
+              <label class="field grow">Satz<input id="rt-text" maxlength="500" placeholder="z. B. Weck mich morgen um halb sieben" required></label>
+              <button class="btn primary">Prüfen</button>
+            </form>
+            <div id="rt-result"></div>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-check"/></svg>Auswertung</h2><div class="btn-row"><button class="btn small" id="rt-retrain"><svg><use href="#i-refresh"/></svg>Neu lernen</button><button class="btn small primary" id="rt-eval">Testsatz prüfen</button></div></header>
+            <div id="rt-eval-out"><p class="muted small">Prüft alle Sätze aus <code>router_eval.yaml</code> gegen den aktuellen Router.</p></div>
+          </section>
+        </div>
+        <section class="panel">
+          <header><h2><svg><use href="#i-list"/></svg>Letzte Entscheidungen</h2>
+            <label class="inline-field">Weg <select id="rt-filter"><option value="">alle</option><option value="fast">Schnell</option><option value="ask_slot">Rückfrage</option><option value="focused">LLM (gezielt)</option><option value="full">LLM (alle Werkzeuge)</option><option value="escalate">Cloud</option></select></label>
+          </header>
+          <div class="table-wrap"><table class="table" id="rt-log"><thead><tr><th>Zeit</th><th>Gerät</th><th>Satz</th><th>Absicht</th><th class="num">Sicherheit</th><th>Weg</th><th class="num">ms</th><th>Korrektur</th></tr></thead><tbody></tbody></table></div>
+          <button class="btn small ghost more" id="rt-more">Ältere laden</button>
+        </section>
+        <section class="panel">
+          <header><h2><svg><use href="#i-list"/></svg>Absichten</h2></header>
+          <div class="chips" id="rt-intents"></div>
+        </section>
+      </section>
+
+      <!-- ---------- Gedächtnis ---------- -->
+      <section class="page" data-page="memory" hidden>
+        <section class="panel">
+          <header><h2><svg><use href="#i-brain"/></svg>Was Jarvis sich merkt</h2><small id="mem-count"></small></header>
+          <form class="form-row" id="mem-form">
+            <label class="field grow">Neuer Eintrag<input id="mem-text" minlength="3" maxlength="300" placeholder="z. B. Meine Frau heißt Anna" required></label>
+            <button class="btn primary"><svg><use href="#i-new"/></svg>Merken</button>
+          </form>
+          <ul class="rows" id="mem-list"></ul>
+        </section>
+      </section>
+
+      <!-- ---------- Skripte ---------- -->
+      <section class="page" data-page="scripts" hidden>
+        <p class="muted page-note">Skripte stehen in <code>/config/scripts.yaml</code> und laufen getrennt im Runner. Jarvis darf sie nur mit den hier gezeigten Parametern aufrufen.</p>
+        <div class="cards" id="sc-list"></div>
+      </section>
+
+      <!-- ---------- Timer ---------- -->
+      <section class="page" data-page="timers" hidden>
+        <section class="panel">
+          <header><h2><svg><use href="#i-timer"/></svg>Timer, Wecker und Erinnerungen</h2></header>
+          <ul class="rows" id="tm-list"></ul>
+        </section>
+      </section>
+
+      <!-- ---------- Protokoll ---------- -->
+      <section class="page" data-page="audit" hidden>
+        <section class="panel">
+          <header><h2><svg><use href="#i-list"/></svg>Aktionsprotokoll</h2><small>Werkzeugaufrufe, Bestätigungen, Verwaltung</small></header>
+          <div class="table-wrap"><table class="table" id="au-table"><thead><tr><th>Zeit</th><th>Wer</th><th>Aktion</th><th>Details</th><th>Ergebnis</th></tr></thead><tbody></tbody></table></div>
+          <button class="btn small ghost more" id="au-more">Ältere laden</button>
+        </section>
+      </section>
+
+      <!-- ---------- System ---------- -->
+      <section class="page" data-page="system" hidden>
+        <div class="cards">
+          <section class="panel">
+            <header><h2><svg><use href="#i-refresh"/></svg>Neu einlesen</h2></header>
+            <p class="small">Lädt <code>intents.yaml</code>, <code>scripts.yaml</code> und die Router-Beispiele neu – ohne Neustart. Änderungen an <code>config.yaml</code> und <code>secrets.yaml</code> brauchen einen Neustart des Containers.</p>
+            <button class="btn" id="sys-reload"><svg><use href="#i-refresh"/></svg>Jetzt neu einlesen</button>
+            <p class="small" id="sys-reload-out" role="status"></p>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-key"/></svg>Geheimnisse</h2><small>nur Namen, keine Werte</small></header>
+            <div class="chips" id="sys-secrets"></div>
+          </section>
+        </div>
+        <section class="panel">
+          <header><h2><svg><use href="#i-settings"/></svg>Aktive Konfiguration</h2><small>Werte aus <code>config.yaml</code> nach Umgebungsvariablen</small></header>
+          <div class="config-tree" id="sys-config"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= Kopplungsdialog ================= -->
+  <dialog class="sheet" id="pair-dialog">
+    <form method="dialog" class="sheet-body" id="pair-body"></form>
+  </dialog>
+  <dialog class="sheet" id="confirm-dialog">
+    <form method="dialog" class="sheet-body">
+      <h2 id="confirm-title">Sicher?</h2>
+      <p id="confirm-text"></p>
+      <menu class="sheet-actions"><button class="btn ghost" value="cancel">Abbrechen</button><button class="btn danger" value="ok" id="confirm-ok">Ja</button></menu>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+
   <script src="admin.js" type="module"></script>
 </body>
 </html>

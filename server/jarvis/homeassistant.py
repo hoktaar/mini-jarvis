@@ -25,6 +25,10 @@ STATE_DE = {"on": "an", "off": "aus", "locked": "verschlossen", "unlocked": "off
             "heat": "heizt", "cool": "kühlt", "auto": "automatisch", "armed_away": "scharf",
             "disarmed": "unscharf", "home": "zuhause", "not_home": "weg", "docked": "angedockt",
             "cleaning": "saugt"}
+# Seiten auf dem CYD: „Licht“ und „Musik“
+GROUPS = {"light": {"light", "switch", "fan", "input_boolean", "scene", "script"}, "media": {"media_player"}}
+MEDIA_ACTIONS = {"play_pause": "media_play_pause", "next": "media_next_track", "previous": "media_previous_track",
+                 "volume_up": "volume_up", "volume_down": "volume_down"}
 
 
 class HomeAssistant:
@@ -56,6 +60,9 @@ class HomeAssistant:
             display = f"{value}{unit if unit in ('°C', '°F', '%') else ' ' + unit if unit else ''}".strip()
         else:
             display = STATE_DE.get(value, value)
+        if domain == "media_player" and value == "playing" and attrs.get("media_title"):
+            artist = attrs.get("media_artist")
+            display = f"{artist} – {attrs['media_title']}" if artist else attrs["media_title"]
         return {"entity_id": entity, "name": attrs.get("friendly_name", entity), "domain": domain,
                 "state": value, "display": display, "icon": ICONS.get(domain, "dot"),
                 "on": value in ("on", "open", "unlocked", "playing", "heat", "cool"),
@@ -74,6 +81,31 @@ class HomeAssistant:
         tiles = [self.tile(states[e]) for e in self.cfg.entities if e in states]
         self._cache = (time.time(), tiles)
         return tiles
+
+    async def group(self, name: str) -> list[dict]:
+        """Kacheln einer CYD-Seite in kompakter Form (wenig RAM auf dem ESP32)."""
+        domains = GROUPS.get(name)
+        out = []
+        for t in await self.tiles():
+            if domains is not None and t["domain"] not in domains:
+                continue
+            kind = "media" if t["domain"] == "media_player" else "toggle" if t["toggle"] else \
+                "activate" if t["activate"] else "sensor"
+            out.append({"id": t["entity_id"], "name": t["name"][:28], "display": t["display"][:40], "on": t["on"],
+                        "kind": kind, "available": t["available"]})
+        return out[:12]
+
+    async def media(self, entity_id: str, action: str) -> dict:
+        if entity_id not in self.cfg.entities or not entity_id.startswith("media_player."):
+            raise PermissionError("Kein freigegebener Mediaplayer")
+        service = MEDIA_ACTIONS.get(action)
+        if service is None:
+            raise PermissionError("Unbekannte Aktion")
+        async with self._client() as c:
+            r = await c.post(f"/api/services/media_player/{service}", json={"entity_id": entity_id})
+            r.raise_for_status()
+        self._cache = None
+        return {"ok": True, "service": service}
 
     async def toggle(self, entity_id: str) -> dict:
         if entity_id not in self.cfg.entities:

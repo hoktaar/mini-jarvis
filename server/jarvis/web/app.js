@@ -1,8 +1,8 @@
 // Mini-Jarvis – HUD-Dashboard und Sprachbedienung (Pipecat RTVI, lokal gebündelt).
 import { formatMbit, renderMeters, renderNetmap, renderSpark, setRing, startWave } from "./hud.js";
+import { $, el, icon, store, toast } from "./ui.js";
 import { PipecatClient, WavMediaManager, WebSocketTransport } from "./vendor/pipecat.js";
 
-const $ = (id) => document.getElementById(id);
 const STATE_TEXT = {
   idle: "Bereit – tippe zum Sprechen", listening: "Höre zu …", thinking: "Denke nach …", speaking: "Jarvis spricht",
   alarm: "Alarm!", offline: "Nicht verbunden", connecting: "Verbinde …",
@@ -19,10 +19,6 @@ const INTENT_NAME = {
 const WEATHER_ICON = (code) => (code == null ? "i-cloud" : code <= 1 ? "i-sun" : code >= 51 ? "i-rain" : "i-cloud");
 
 // ---------------------------------------------------------------- Speicher
-const store = {
-  get(k, d) { try { const v = localStorage.getItem(`jarvis-${k}`); return v === null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(`jarvis-${k}`, JSON.stringify(v)); } catch { /* privat */ } },
-};
 const tokenStore = {
   get() { try { return localStorage.getItem("jarvis-token") || ""; } catch { return ""; } },
   set(t) { try { t ? localStorage.setItem("jarvis-token", t) : localStorage.removeItem("jarvis-token"); } catch { /* privat */ } },
@@ -52,27 +48,6 @@ async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
-function el(tag, attrs = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") node.className = v;
-    else if (k.startsWith("on")) { if (v) node.addEventListener(k.slice(2), v); }
-    else if (v !== false && v != null) node.setAttribute(k, v === true ? "" : v);
-  }
-  for (const c of children.flat()) if (c != null) node.append(c instanceof Node ? c : document.createTextNode(c));
-  return node;
-}
-const icon = (id) => {
-  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  const u = document.createElementNS("http://www.w3.org/2000/svg", "use");
-  u.setAttribute("href", `#${id}`); s.append(u); return s;
-};
-
-let toastTimer;
-function toast(text, ms = 3200) {
-  const t = $("toast"); t.textContent = text; t.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
-}
 
 function banner(id, text, actions = [], kind = "") {
   let b = document.querySelector(`[data-banner="${id}"]`);

@@ -55,9 +55,11 @@ async def send_initial_state(session: JarvisSession) -> None:
     """Nach dem Verbinden: Privatmodus, Lautstärke, Timer und klingelnde Alarme melden."""
     services = session.services
     from jarvis import __version__
+    from jarvis.posix_tz import posix_tz
 
     await session.emit({"type": "hello", "device": session.device.name, "kind": session.device.kind,
-                        "room": session.device.room, "version": __version__})
+                        "room": session.device.room, "version": __version__, "time": int(time.time()),
+                        "tz": posix_tz(services.cfg.location.timezone)})
     await session.emit({"type": "private", "value": session.private})
     if session.device.satellite:
         await session.emit({"type": "volume", "value": int(session.device.settings.get("volume", 70))})

@@ -152,6 +152,33 @@ class ClientInputProcessor(FrameProcessor):
             services.firmware.status_update(s.device, msg)
         elif kind == "stop":
             await s.stop_output()
+        elif kind in ("home_list", "home_toggle", "home_media"):
+            await self._home(msg)
+
+    async def _home(self, msg: dict) -> None:
+        """Smarthome-Seiten des CYD („Licht“, „Musik“): Liste holen, schalten, Medien steuern."""
+        s = self.session
+        home = s.services.home
+        group = str(msg.get("group") or "all")[:16]
+        if home is None or not home.configured:
+            await s.emit({"type": "home", "group": group, "configured": False, "items": []})
+            return
+        entity = str(msg.get("id") or "")[:120]
+        try:
+            if msg["type"] == "home_toggle":
+                result = await home.toggle(entity)
+                s.services.feed.add(f"{result['name']} geschaltet ({s.device.name})", "ok", "home")
+            elif msg["type"] == "home_media":
+                await home.media(entity, str(msg.get("action") or ""))
+            items = await home.group(group)
+        except PermissionError as e:
+            await s.emit({"type": "notice", "text": str(e)})
+            return
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Home Assistant: {e}")
+            await s.emit({"type": "notice", "text": "Home Assistant ist nicht erreichbar."})
+            return
+        await s.emit({"type": "home", "group": group, "configured": True, "items": items})
 
 
 class WakeWordGate(FrameProcessor):

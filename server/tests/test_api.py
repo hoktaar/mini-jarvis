@@ -59,7 +59,7 @@ def test_cyd_provisioning_info(client, admin):
 
 def test_overview_and_router_tools(client, admin):
     o = client.get("/api/admin/overview", headers=admin).json()
-    assert o["providers"]["stt"].startswith("none") and "warnings" in o
+    assert o["providers"]["stt"] == "aus" and "warnings" in o and o["timezone"] == "Europe/Berlin"
     t = client.post("/api/admin/router/test", json={"text": "Weck mich morgen um sieben"}, headers=admin).json()
     assert t["intent"] == "alarm_set" and "datetime" in t["slots"]
     ev = client.get("/api/admin/router/eval", headers=admin).json()

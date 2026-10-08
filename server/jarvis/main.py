@@ -376,13 +376,14 @@ async def overview(request: Request):
                  "since": s.voice.started if s.voice else None, "private": s.private,
                  "transport": "voice" if s.voice else "chat"} for s in services.online()]
     return {
-        "version": __version__, "uptime_s": int(time.time() - services.started),
+        "version": __version__, "uptime_s": int(time.time() - services.started), "timezone": cfg.location.timezone,
         "warnings": services.warnings, "sessions": sessions, "checks": reachable,
         "providers": {
             "llm_primary": p.llm.primary,
             "llm_local": f"{p.llm.local.model} (Ollama)" if p.llm.local.enabled else "aus",
             "llm_cloud": f"{p.llm.cloud.type}: {p.llm.cloud.model}" if p.llm.cloud.enabled else "aus",
-            "stt": f"{p.stt.type} {p.stt.model}".strip(), "tts": f"{p.tts.type} {p.tts.voice}".strip(),
+            "stt": "aus" if p.stt.type == "none" else f"{p.stt.type} {p.stt.model}".strip(),
+            "tts": "aus" if p.tts.type == "none" else f"{p.tts.type} {p.tts.voice}".strip(),
             "search": cfg.search.provider, "cloud_services": cloud_services(cfg),
         },
         "metrics": services.metrics.summary(), "budget": services.budget.summary(),
@@ -426,6 +427,15 @@ async def _service_checks() -> dict:
     return checks
 
 
+@app.get("/api/admin/provision-info", dependencies=admin)
+async def provision_info(request: Request):
+    """Vorschläge für den USB-Einrichtungsassistenten (Server-Adresse, Port, Zeitzone)."""
+    from jarvis.posix_tz import posix_tz
+
+    return {"hosts": _host_suggestions(request), "port": services.cfg.server.port,
+            "tz": posix_tz(services.cfg.location.timezone)}
+
+
 @app.get("/api/admin/devices", dependencies=admin)
 async def list_devices():
     return [_device_row(d) for d in services.devices.list()]
@@ -439,11 +449,26 @@ async def create_device(d: NewDevice, request: Request):
     return _pairing(device, token, request)
 
 
+def _host_suggestions(request: Request) -> list[str]:
+    """Adressen, unter denen ein ESP32 den Server erreichen könnte (ohne localhost/Platzhalter)."""
+    names = [request.url.hostname or "", *services.cfg.server.https.hosts]
+    out = []
+    for n in names:
+        n = n.strip()
+        if n and n not in out and n not in ("localhost", "127.0.0.1", "::1", "*") and not n.startswith("*."):
+            out.append(n)
+    return out
+
+
 def _pairing(device: Device, token: str, request: Request) -> dict:
     out = {"id": device.id, "name": device.name, "kind": device.kind, "token": token,
            "hint": "Token nur jetzt sichtbar."}
     if device.satellite:
-        out["provision"] = {"host": request.url.hostname or "", "port": services.cfg.server.port, "token": token}
+        from jarvis.posix_tz import posix_tz
+
+        out["provision"] = {"host": request.url.hostname or "", "port": services.cfg.server.port, "token": token,
+                            "name": device.name, "tz": posix_tz(services.cfg.location.timezone),
+                            "hosts": _host_suggestions(request)}
     else:
         url = f"{_pair_base(request)}/#pair={token}"
         out["pair_url"] = url
