@@ -72,6 +72,7 @@ def build_registry(cfg: JarvisConfig, db: Database, timers: TimerService,
 
             service = CalendarService(cfg.calendar, secrets.get(cfg.calendar.password_secret, ""),
                                       cfg.location.timezone)
+            reg.calendar = service
             for t in make_calendar_tools(service):
                 reg.add(t)
         except ImportError:

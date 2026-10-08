@@ -468,7 +468,8 @@ class System1Processor(FrameProcessor):
         if text:
             ctx.add_message({"role": "assistant", "content": text})
             s.last_assistant_text = text
-            await self.push_frame(ev(type="text", role="assistant", content=text, meta=meta or {}))
+            meta = {**(meta or {}), "confirm": s.pending_valid()}
+            await self.push_frame(ev(type="text", role="assistant", content=text, meta=meta))
             if self._speaks():
                 await self.push_frame(TTSSpeakFrame(text, append_to_context=False))
         await self._done(spoken=bool(text) and self._speaks())
@@ -527,7 +528,8 @@ class ClientEventsProcessor(FrameProcessor):
             self._text = []
             if text and text != s.last_assistant_text:     # Schnellweg-Texte nicht doppelt
                 s.last_assistant_text = text
-                meta = {"route": s.turn.route or "llm", "intent": s.turn.intent, "provider": s.turn.provider}
+                meta = {"route": s.turn.route or "llm", "intent": s.turn.intent, "provider": s.turn.provider,
+                        "confirm": s.pending_valid()}
                 await self.push_frame(ev(type="text", role="assistant", content=text, meta=meta))
             if s.services.gpu is not None:
                 s.services.gpu.llm_used()

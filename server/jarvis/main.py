@@ -197,6 +197,7 @@ async def me(device: Device = Depends(require_device)):
     return {"id": device.id, "name": device.name, "kind": device.kind, "room": device.room,
             "private": bool(device.settings.get("private")), "version": __version__,
             "cloud_services": cloud_services(services.cfg), "connected": bool(session and session.voice),
+            "timezone": services.cfg.location.timezone,
             "timers": services.timers.items(), "now": time.time()}
 
 
@@ -241,6 +242,102 @@ async def alarm_snooze(timer_id: int, body: Snooze, device: Device = Depends(req
     new_id = services.timers.snooze(timer_id, max(1, min(60, body.minutes)))
     await services.broadcast({"type": "alarm_stop", "id": timer_id})
     return {"ok": new_id is not None, "id": new_id}
+
+
+_calendar_cache: dict[str, tuple[float, list]] = {}
+
+
+async def _upcoming_calendar() -> list[dict]:
+    """Termine heute und morgen (5 Minuten zwischengespeichert)."""
+    from datetime import datetime, timedelta
+
+    cal = services.calendar
+    if cal is None:
+        return []
+    hit = _calendar_cache.get("events")
+    if hit and time.time() - hit[0] < 300:
+        return hit[1]
+    today = datetime.now(cal.tz).date()
+    events = []
+    for offset in (0, 1):
+        for e in await cal.events(today + timedelta(days=offset)):
+            events.append({"kind": "event", "label": e["summary"], "due": e["start"].timestamp(),
+                           "all_day": e["all_day"], "source": e["calendar"]})
+    _calendar_cache["events"] = (time.time(), events)
+    return events
+
+
+def _capabilities() -> list[dict]:
+    reg = services.registry
+    cfg = services.cfg
+    has = lambda *names: any(reg.get(n) for n in names)  # noqa: E731
+    return [
+        {"name": "Timer & Wecker", "ok": has("set_timer")},
+        {"name": "Wetter", "ok": not (cfg.location.latitude == 0 and cfg.location.longitude == 0)},
+        {"name": "Websuche", "ok": has("search_web")},
+        {"name": "Smarthome", "ok": services.home.configured or has("HassTurnOn", "GetLiveContext")},
+        {"name": "Kalender", "ok": has("calendar_agenda")},
+        {"name": "Gedächtnis", "ok": has("remember")},
+        {"name": "Container", "ok": has("container_status")},
+        {"name": "Cloud-KI", "ok": cfg.providers.llm.cloud.enabled},
+    ]
+
+
+@app.get("/api/dashboard")
+async def dashboard(device: Device = Depends(require_device)):
+    """Alles für die Startseite in einer Anfrage (Teile, die hängen, liefern einfach nichts)."""
+    from jarvis.tools.weather import current_weather
+
+    cfg = services.cfg
+
+    async def safe(coro, default):
+        try:
+            return await asyncio.wait_for(coro, 6)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Dashboard-Teil fehlgeschlagen: {e}")
+            return default
+
+    weather, tiles, events = await asyncio.gather(
+        safe(current_weather(cfg.location), None),
+        safe(services.home.tiles(), []) if services.home.configured else asyncio.sleep(0, []),
+        safe(_upcoming_calendar(), []),
+    )
+    devices = [d for d in services.devices.list() if not d["revoked"]]
+    online = {s.device.id for s in services.online()}
+    recent = [dict(r) for r in services.db.query(
+        "SELECT text, intent, route, ts FROM router_log WHERE device_id=? AND text != '…' ORDER BY id DESC LIMIT 8",
+        (device.id,))]
+    upcoming = sorted(
+        [{"kind": t["kind"], "label": t["label"], "due": t["due"], "id": t["id"], "ringing": t["ringing"]}
+         for t in services.timers.items()] + events, key=lambda x: x["due"])[:12]
+    return {
+        "now": time.time(), "timezone": cfg.location.timezone, "place": cfg.location.name,
+        "weather": weather, "version": __version__,
+        "devices": {"online": len(online), "total": len(devices),
+                    "rooms": sorted({d["room"] for d in devices if d["room"]}),
+                    "list": [{"name": d["name"], "room": d["room"], "kind": d["kind"], "online": d["id"] in online}
+                             for d in devices]},
+        "warnings": len(services.warnings), "system": services.stats.snapshot() if services.stats else {},
+        "capabilities": _capabilities(), "recent": recent, "upcoming": upcoming,
+        "feed": services.feed.latest(20) if services.feed else [],
+        "home": {"configured": services.home.configured, "tiles": tiles},
+        "budget": services.budget.summary() if cfg.providers.llm.cloud.enabled else None,
+    }
+
+
+@app.post("/api/home/{entity_id}/toggle")
+async def home_toggle(entity_id: str, device: Device = Depends(require_device)):
+    if not services.home.configured:
+        raise HTTPException(400, "Home Assistant ist nicht eingerichtet")
+    try:
+        result = await services.home.toggle(entity_id)
+    except PermissionError as e:
+        raise HTTPException(403, str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Home Assistant: {type(e).__name__}") from e
+    services.db.audit(f"device:{device.id}", "ha_toggle", entity_id, "ok")
+    services.feed.add(f"{result['name']} geschaltet ({device.name})", "ok", "home")
+    return result
 
 
 @app.get("/api/firmware/{variant}/{name}")

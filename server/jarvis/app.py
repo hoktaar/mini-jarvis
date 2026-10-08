@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from jarvis.config import (
 )
 from jarvis.db import Database
 from jarvis.devices import DeviceRegistry
+from jarvis.feed import Feed
 from jarvis.firmware import FirmwareManager
 from jarvis.gpu import GpuMonitor
 from jarvis.mcp import McpManager
@@ -108,6 +110,19 @@ def build_services(config_dir: Path = CONFIG_DIR, data_dir: Path = DATA_DIR, db_
     services.firmware = FirmwareManager(Path(data_dir), cfg.firmware.auto_update)
     services.warnings = config_warnings(cfg, secrets)
     services.config_dir = config_dir
+    services.calendar = registry.calendar
+    services.feed = Feed()
+
+    async def push_feed(item: dict) -> None:
+        await services.broadcast({"type": "feed", "item": item}, screens_only=True)
+
+    services.feed.on_add = push_feed
+    from jarvis.homeassistant import HomeAssistant
+    from jarvis.system_stats import SystemStats
+
+    services.home = HomeAssistant(cfg.homeassistant, secrets.get(cfg.homeassistant.token_secret, ""))
+    services.stats = SystemStats({"Daten": Path(data_dir), "Modelle": Path(os.environ.get("JARVIS_MODELS_DIR", "/models"))})
+    services.mcp.on_change = lambda: services.feed.add("Werkzeuge verbunden (MCP)", "ok", "system")
     for w in services.warnings:
         logger.warning(f"Konfiguration: {w}")
     return services
@@ -126,6 +141,8 @@ async def deliver_alarm(services: Services, row: dict) -> None:
     for s in receivers:
         await s.emit(event)
         await s.speak(speech)
+    if services.feed is not None:
+        services.feed.add(f"{KIND_NAMES.get(kind, kind)} {label or ''} ausgelöst".replace("  ", " "), "ok", "timer")
     if services.notifier is not None and services.notifier.wants(kind, target_online):
         title = {"timer": "Timer abgelaufen", "alarm": "Wecker", "reminder": "Erinnerung"}.get(kind, "Jarvis")
         await services.notifier.send(title, speech)
@@ -151,6 +168,9 @@ async def start_background(services: Services) -> list[asyncio.Task]:
     services.timers.start()
     services.mcp.start()
     services.gpu.start()
+    services.stats.start()
+    services.feed.add(f"Jarvis gestartet – {len(services.warnings)} Hinweis(e)" if services.warnings
+                      else "Jarvis gestartet – alle Systeme bereit", "warn" if services.warnings else "ok")
     tasks = [asyncio.create_task(_purge_loop(services)), asyncio.create_task(reap_idle(services))]
     tasks.append(asyncio.create_task(asyncio.to_thread(preload, services.cfg)))
     services.adapters = await start_adapters(services)
@@ -162,6 +182,7 @@ async def stop_background(services: Services, tasks: list[asyncio.Task]) -> None
     for t in tasks:
         t.cancel()
     await services.timers.stop()
+    await services.stats.stop()
     for stop in getattr(services, "adapters", []) or []:
         try:
             await stop()

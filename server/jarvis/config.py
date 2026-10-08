@@ -180,6 +180,7 @@ class RouterCfg(_Cfg):
     enabled: bool = True
     thresholds: ThresholdCfg = ThresholdCfg()
     confirm_threshold: float = 0.9
+    slot_boost: float = 0.1           # Pflichtangaben erkannt → Schnellweg schon ab fast - slot_boost
     confirm_timeout: float = 20.0     # Sekunden, danach verfällt eine offene Bestätigung
     dialog_timeout: float = 30.0      # Sekunden für Rückfragen (fehlende Angaben)
     per_intent: dict[str, ThresholdCfg] = Field(default_factory=dict)
@@ -231,6 +232,14 @@ class CalendarCfg(_Cfg):
     password_secret: str = "caldav_password"
     calendars: list[str] = Field(default_factory=list)   # leer = alle
     default_calendar: str = ""
+    verify_tls: bool = True
+
+
+class HomeAssistantCfg(_Cfg):
+    enabled: bool = False
+    url: str = ""                     # z. B. http://homeassistant.local:8123
+    token_secret: str = "homeassistant_token"
+    entities: list[str] = Field(default_factory=list)   # Kacheln im Dashboard, z. B. light.wohnzimmer
     verify_tls: bool = True
 
 
@@ -287,6 +296,7 @@ class JarvisConfig(_Cfg):
     search: SearchCfg = SearchCfg()
     memory: MemoryCfg = MemoryCfg()
     calendar: CalendarCfg = CalendarCfg()
+    homeassistant: HomeAssistantCfg = HomeAssistantCfg()
     push: PushCfg = PushCfg()
     adapters: AdaptersCfg = AdaptersCfg()
     privacy: PrivacyCfg = PrivacyCfg()
@@ -435,6 +445,9 @@ def config_warnings(cfg: JarvisConfig, secrets_map: dict[str, str]) -> list[str]
             w.append(f"MCP-Server {m.name}: transport {m.transport} braucht eine url.")
     if cfg.calendar.enabled and (not cfg.calendar.url or cfg.calendar.password_secret not in secrets_map):
         w.append("Kalender ist aktiviert, aber url oder Passwort fehlen.")
+    ha = cfg.homeassistant
+    if ha.enabled and (not ha.url or ha.token_secret not in secrets_map):
+        w.append("Home Assistant ist aktiviert, aber url oder Token fehlen.")
     if cfg.push.ntfy.enabled and not cfg.push.ntfy.topic:
         w.append("ntfy ist aktiviert, aber push.ntfy.topic ist leer.")
     if cfg.adapters.telegram.enabled and "telegram_bot_token" not in secrets_map:

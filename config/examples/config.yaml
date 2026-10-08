@@ -1,12 +1,20 @@
 # Mini-Jarvis Hauptkonfiguration
+# Geheimnisse (API-Schlüssel, Passwörter) gehören in secrets.yaml – hier per ${secret:name} einsetzbar.
+# Nach Änderungen den Container neu starten. Absichten/Whitelist/Skripte: „Neu laden“ in der Verwaltung.
+
 server:
   host: 0.0.0.0
-  web_port: 8080          # PWA, REST, Admin
-  ws_port: 8080           # WebSockets laufen über denselben Port wie die Web-UI
-  public_base_url: ""     # z. B. https://jarvis.example.lan (für PWA/HTTPS)
+  port: 8080              # HTTP: ESP32-Satelliten, REST, Weiterleitungshinweis
+  https:
+    enabled: true         # Browser erlauben das Mikrofon nur über HTTPS
+    port: 8443
+    hosts: []             # Namen/IPs fürs Zertifikat, z. B. [192.168.1.144, jarvis.lan] (oder JARVIS_HOSTS)
+    certfile: ""          # eigenes Zertifikat (z. B. Let's Encrypt) – sonst eigene CA unter /data/tls
+    keyfile: ""
+  public_url: ""          # z. B. https://jarvis.lan:8443 – für Pairing-Links/QR-Codes
 
 language: de
-location:                 # Standard für Wetter
+location:                 # Standard für Wetter, Zeitzone für Wecker und Erinnerungen
   name: "Zuhause"
   latitude: 0.0
   longitude: 0.0
@@ -18,7 +26,9 @@ persona: |
   Wenn du ein Werkzeug benutzt, sag kurz, was du getan hast.
 
 gpu:
-  comfyui_mode: false     # true: Whisper auf CPU, Ollama entlädt schnell
+  comfyui_mode: off       # off | on | auto (auto: Sparmodus, solange der ComfyUI-Container läuft)
+  comfyui_container: comfyui
+  unload_after_seconds: 60
 
 audio:
   sample_rate: 16000
@@ -26,35 +36,52 @@ audio:
     enabled: true
     model: hey_jarvis
     threshold: 0.5
-    listen_seconds: 8     # so lange nach dem Wake-Word zuhören
+    listen_seconds: 8         # so lange nach dem Wake-Word zuhören
+    max_listen_seconds: 25    # Obergrenze, auch wenn es laut bleibt (Fernseher)
+    follow_up: question       # off | question (nach Rückfragen weiter zuhören) | always
+    follow_up_seconds: 6
 
+# ---------------------------------------------------------------------------
+# Anbieter: jede Rolle lokal ODER in der Cloud. API-Schlüssel in secrets.yaml.
+# ---------------------------------------------------------------------------
 providers:
-  stt:
-    type: whisper         # whisper | deepgram | openai
-    model: large-v3-turbo
-    device: cuda          # cuda | cpu
+  stt:                    # Spracherkennung
+    type: whisper         # whisper (lokal) | openai | groq | deepgram | azure | google | elevenlabs | none
+    model: large-v3-turbo # whisper: large-v3-turbo · openai: gpt-4o-transcribe · groq: whisper-large-v3-turbo · deepgram: nova-3
+    device: cuda          # nur whisper: cuda | cpu
     compute_type: int8_float16
-  tts:
-    type: piper           # piper | elevenlabs | cartesia | openai
-    voice: de_DE-thorsten-high
+    base_url: ""          # openai: auch eigener kompatibler Endpunkt möglich
+    region: ""            # azure
+  tts:                    # Sprachausgabe
+    type: piper           # piper (lokal) | openai | elevenlabs | cartesia | deepgram | azure | google | none
+    voice: de_DE-thorsten-high   # piper: Stimme · Cloud: Stimmen-ID des Anbieters
+    model: ""             # z. B. eleven_flash_v2_5 · sonic-2 · gpt-4o-mini-tts
+    region: ""            # azure
   llm:
+    primary: local        # local | cloud – wer normale Fragen beantwortet
+    context_turns: 10     # so viele Wechsel merkt sich Jarvis im Gespräch
     local:
+      enabled: true
       type: ollama
-      base_url: http://127.0.0.1:11434/v1
+      base_url: http://127.0.0.1:11434/v1   # eingebettet; externes Ollama: http://<host>:11434/v1
       model: qwen3:8b
       keep_alive: 10m
-    cloud:                # optional – leer lassen für rein lokal
+      num_ctx: 8192
+      think: false        # Denkmodus aus → schnellere erste Silbe
+    cloud:
       enabled: false
-      type: anthropic     # anthropic | openai | openrouter | openai_compatible
-      model: ""
-      base_url: ""        # nur für openai_compatible/openrouter
-      escalation: manual  # manual | auto
-      failover: true      # bei Ausfall des lokalen LLM
+      type: anthropic     # anthropic | openai | google | mistral | groq | openrouter | deepseek | openai_compatible
+      model: ""           # z. B. claude-sonnet-5-5 · gpt-5-mini · gemini-2.5-flash · mistral-large-latest
+      base_url: ""        # nur openai_compatible (Together, LM Studio, vLLM …) oder eigener Endpunkt
+      escalation: manual  # manual („denk gründlich nach“) | auto (lange offene Fragen)
+      failover: true      # Cloud einspringen lassen, wenn das lokale LLM ausfällt
       budget_eur_day: 1.0
       budget_eur_month: 15.0
-      allowed_tool_risks: [read, write]   # critical bleibt lokal
+      price_input_eur_per_mtok: 3.0    # Preise des Anbieters eintragen (für das Budget)
+      price_output_eur_per_mtok: 15.0
+      allowed_tool_risks: [read, write]   # critical (Container, Skripte) bleibt lokal
   classifier:
-    type: local           # local | jev | llm
+    type: local           # local | jev
 
 router:
   enabled: true
@@ -62,8 +89,14 @@ router:
     fast: 0.85
     focused: 0.5
   confirm_threshold: 0.9
+  confirm_timeout: 20     # Sekunden, danach verfällt eine offene Bestätigung
+  dialog_timeout: 30
   per_intent: {}          # z. B. weather: {fast: 0.8}
   embedding_model: intfloat/multilingual-e5-small
+
+search:
+  provider: searxng       # searxng (lokal, MCP-Server unten) | brave | tavily | none
+  max_results: 5
 
 mcp_servers:
   - name: searxng
@@ -72,6 +105,7 @@ mcp_servers:
     command: searxng-mcp-server   # PyPI-Paket searxng-mcp-server
     env:
       SEARXNG_URL: http://127.0.0.1:8888
+    tools: [search_web, search_news]   # bewusst ohne fetch_url (könnte interne Adressen abrufen)
     risk: read
     taint: true
   - name: docker
@@ -79,7 +113,16 @@ mcp_servers:
     transport: stdio
     command: python
     args: ["-m", "jarvis.mcp_servers.docker_mcp"]
-    risk: mixed           # Status = read, Aktionen = critical (im Server festgelegt)
+    risk: mixed           # Status = read, Aktionen = critical (im Core festgelegt)
+  - name: homeassistant   # Home Assistant: Integration „Model Context Protocol Server“ aktivieren
+    enabled: false
+    transport: http
+    url: http://homeassistant.local:8123/api/mcp
+    headers:
+      Authorization: "Bearer ${secret:homeassistant_token}"
+    tools: [HassTurnOn, HassTurnOff, HassLightSet, HassClimateSetTemperature, GetLiveContext]
+    risk: write           # Licht schalten ist harmlos; Schlösser o. Ä. per tool_risks auf critical setzen
+    tool_risks: {}
 
 news:
   feeds:
@@ -87,17 +130,39 @@ news:
       url: https://www.tagesschau.de/xml/rss2/
   max_items: 5
 
+memory:
+  enabled: true           # „Merk dir, dass …“ – Fakten landen im Systemprompt
+  prompt_items: 20
+
+calendar:                 # CalDAV, z. B. Nextcloud
+  enabled: false
+  url: ""                 # https://cloud.example.lan/remote.php/dav
+  username: ""
+  password_secret: caldav_password
+  calendars: []           # leer = alle
+  default_calendar: ""
+
 push:
   ntfy:
     enabled: false
-    base_url: http://127.0.0.1:2586
+    base_url: https://ntfy.sh   # oder eigener ntfy-Server
+    topic: ""
+    kinds: [timer, alarm, reminder]
+    only_when_offline: true     # nur, wenn das Gerät gerade nicht verbunden ist
 
 adapters:
+  telegram:
+    enabled: false
+    allowed_user_ids: []  # eigene ID: dem Bot /start schicken
   matrix:
     enabled: false
     homeserver: ""
     user_id: ""
     allowed_users: []
-  telegram:
-    enabled: false
-    allowed_user_ids: []
+
+privacy:
+  retention_days: 30      # Router- und Aktionsprotokoll danach löschen (0 = nie)
+  log_text: true          # false: Sätze im Router-Log nicht speichern
+
+firmware:
+  auto_update: false      # ESP32-Satelliten automatisch per OTA aktualisieren

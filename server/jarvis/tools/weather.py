@@ -93,3 +93,31 @@ def make_weather_tool(loc: LocationCfg) -> Tool:
          "place": {"type": "string", "description": "Ortsname, leer = Zuhause"}},
         [], handler, risk="read",
     )
+
+
+_now_cache: dict[str, tuple[float, dict]] = {}
+
+
+async def current_weather(loc: LocationCfg, max_age: float = 600) -> dict | None:
+    """Aktuelles Wetter am eigenen Standort (für die Kopfzeile), 10 Minuten zwischengespeichert."""
+    import time
+
+    if loc.latitude == 0 and loc.longitude == 0:
+        return None
+    key = f"{loc.latitude},{loc.longitude}"
+    hit = _now_cache.get(key)
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1]
+    try:
+        async with httpx.AsyncClient(timeout=6) as client:
+            r = await client.get("https://api.open-meteo.com/v1/forecast", params={
+                "latitude": loc.latitude, "longitude": loc.longitude, "timezone": loc.timezone,
+                "current": "temperature_2m,weather_code,is_day"})
+            r.raise_for_status()
+            cur = r.json()["current"]
+    except Exception:  # noqa: BLE001
+        return hit[1] if hit else None
+    value = {"temp": round(cur["temperature_2m"]), "desc": WMO.get(cur["weather_code"], "wechselhaft"),
+             "code": cur["weather_code"], "day": bool(cur.get("is_day", 1)), "place": loc.name}
+    _now_cache[key] = (time.time(), value)
+    return value

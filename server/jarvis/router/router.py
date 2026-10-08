@@ -228,6 +228,11 @@ class Router:
 
         if intent.tool is None and not intent.tools:
             return Decision(Route.FULL, name, confidence)
+        if intent.fast and intent.tool and intent.slots and fast_t > confidence >= max(focused_t, fast_t - self.cfg.slot_boost):
+            # Der Slot-Parser bestätigt die Absicht (z. B. „Timer“ + erkannte Dauer) → Schnellweg.
+            found = self._extract(intent, text)
+            if all(s in found for s in intent.slots):
+                return Decision(Route.FAST, name, confidence, found)
         if confidence >= fast_t and intent.fast and intent.tool:
             found = self._extract(intent, text)
             missing = [s for s in intent.slots if s not in found]

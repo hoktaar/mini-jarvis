@@ -47,6 +47,7 @@ class Tool:
 class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}
+        self.calendar = None              # CalendarService, falls eingerichtet (fürs Dashboard)
 
     def add(self, tool: Tool) -> None:
         self._tools[tool.name] = tool

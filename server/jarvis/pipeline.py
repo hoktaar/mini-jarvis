@@ -74,13 +74,15 @@ async def run_device_session(websocket: WebSocket, device: Device, services: Ser
     rate = cfg.audio.sample_rate
     session = services.session_for(device)
     satellite = device.satellite
+    # Der Browser-Player (WavMediaManager) spielt fest mit 24 kHz; der CYD bekommt 16 kHz.
+    out_rate = rate if satellite else 24000
 
     serializer = CydFrameSerializer(rate) if satellite else RtviProtobufSerializer()
     transport = FastAPIWebsocketTransport(
         websocket,
         FastAPIWebsocketParams(
             audio_in_enabled=True, audio_out_enabled=True,
-            audio_in_sample_rate=rate, audio_out_sample_rate=rate,
+            audio_in_sample_rate=rate, audio_out_sample_rate=out_rate,
             add_wav_header=False, serializer=serializer,
         ),
     )
@@ -122,7 +124,7 @@ async def run_device_session(websocket: WebSocket, device: Device, services: Ser
 
     task = PipelineWorker(
         Pipeline(stages),
-        params=PipelineParams(audio_in_sample_rate=rate, audio_out_sample_rate=rate,
+        params=PipelineParams(audio_in_sample_rate=rate, audio_out_sample_rate=out_rate,
                               enable_metrics=True, enable_usage_metrics=True),
         enable_rtvi=not satellite,
         # Geräte warten oft lange auf „Hey Jarvis“ – Pipecats 5-Minuten-Leerlaufabbruch aus.

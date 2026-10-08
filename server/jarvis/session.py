@@ -33,6 +33,14 @@ WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"
 MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
           "November", "Dezember"]
 VOLUME_STEP = 15
+# Kurze deutsche Bezeichnungen für den Live-Feed
+TOOL_LABELS = {
+    "set_timer": "Timer gestellt", "cancel_timer": "Timer/Wecker gelöscht", "set_alarm": "Wecker gestellt",
+    "set_reminder": "Erinnerung angelegt", "remember": "Etwas gemerkt", "forget": "Etwas vergessen",
+    "container_action": "Container-Aktion", "run_script": "Skript ausgeführt", "set_private_mode": "Privatmodus geändert",
+    "calendar_add": "Termin angelegt", "HassTurnOn": "Gerät eingeschaltet", "HassTurnOff": "Gerät ausgeschaltet",
+    "HassLightSet": "Licht eingestellt", "HassClimateSetTemperature": "Temperatur eingestellt",
+}
 
 RULES = (
     "Regeln: Antworte auf Deutsch in kurzen, natürlich gesprochenen Sätzen ohne Markdown, Listen oder Emojis. "
@@ -61,6 +69,10 @@ class Services:
     gpu: Any = None
     mcp: Any = None
     firmware: Any = None
+    feed: Any = None
+    stats: Any = None
+    home: Any = None
+    calendar: Any = None
     warnings: list[str] = field(default_factory=list)
     started: float = field(default_factory=time.time)
     config_dir: Any = None
@@ -78,10 +90,11 @@ class Services:
     def online(self) -> list[JarvisSession]:
         return [s for s in self.sessions.values() if s.online]
 
-    async def broadcast(self, event: dict, exclude: int | None = None) -> None:
+    async def broadcast(self, event: dict, exclude: int | None = None, screens_only: bool = False) -> None:
         for s in self.online():
-            if s.device.id != exclude:
-                await s.emit(event)
+            if s.device.id == exclude or (screens_only and not s.uses_rtvi):
+                continue
+            await s.emit(event)
 
     async def broadcast_timers(self) -> None:
         await self.broadcast({"type": "timers", "items": self.timers.items(), "now": time.time()})
@@ -206,6 +219,8 @@ class JarvisSession:
 
     # --------------------------------------------------------------- Verbindung
     async def attach_voice(self, conn: Connection) -> None:
+        if self.services.feed is not None:
+            self.services.feed.add(f"{self.device.name} verbunden", "ok", "device")
         old, self.voice = self.voice, conn
         if old is not None and old is not conn:
             logger.info(f"{self.device.name}: neue Verbindung ersetzt die alte")
@@ -215,6 +230,8 @@ class JarvisSession:
     def detach_voice(self, conn: Connection) -> None:
         if self.voice is conn:
             self.voice = None
+            if self.services.feed is not None:
+                self.services.feed.add(f"{self.device.name} getrennt", "info", "device")
         self.services.devices.touch(self.device.id)
 
     async def disconnect(self, code: int = 4401, reason: str = "") -> None:
@@ -405,6 +422,13 @@ class JarvisSession:
             self.services.db.audit(f"device:{self.device.id}", name,
                                    json.dumps(args, ensure_ascii=False, default=str)[:500],
                                    ("ok" if result.ok else "fehler") + (" (bestätigt)" if confirmed else ""))
+            if self.services.feed is not None:
+                label = TOOL_LABELS.get(name, name)
+                if name == "container_action":
+                    label = f"Container {args.get('name')}: {args.get('action')}"
+                self.services.feed.add(f"{self.device.name}: {label}" + (" (bestätigt)" if confirmed else "")
+                                       + ("" if result.ok else " – fehlgeschlagen"),
+                                       "ok" if result.ok else "warn", "action")
         return result
 
     @staticmethod
