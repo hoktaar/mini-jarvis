@@ -12,3 +12,6 @@ firmware/cyd/.vscode/
 *.log
 .env
 server/build/
+firmware/cyd/dist/
+firmware/cyd/tools/preview/preview
+*.ppm
