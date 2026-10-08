@@ -228,8 +228,10 @@ class Router:
 
         if intent.tool is None and not intent.tools:
             return Decision(Route.FULL, name, confidence)
-        if intent.fast and intent.tool and intent.slots and fast_t > confidence >= max(focused_t, fast_t - self.cfg.slot_boost):
-            # Der Slot-Parser bestätigt die Absicht (z. B. „Timer“ + erkannte Dauer) → Schnellweg.
+        # Der Slot-Parser bestätigt die Absicht (z. B. „Timer“ + erkannte Dauer) → Schnellweg.
+        # Mehrere erkannte Pflichtangaben (Zeitpunkt UND Text) sind ein stärkeres Indiz → größerer Bonus.
+        boost = self.cfg.slot_boost * min(2, len(intent.slots))
+        if intent.fast and intent.tool and intent.slots and fast_t > confidence >= max(focused_t, fast_t - boost):
             found = self._extract(intent, text)
             if all(s in found for s in intent.slots):
                 return Decision(Route.FAST, name, confidence, found)

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>mini-jarvis</Name>
+  <Name>mini-jarvis-cpu</Name>
   <Repository>ghcr.io/hoktaar/mini-jarvis:latest</Repository>
   <Registry>https://github.com/hoktaar/mini-jarvis/pkgs/container/mini-jarvis</Registry>
   <Network>bridge</Network>
@@ -9,13 +9,12 @@
   <Support>https://github.com/hoktaar/mini-jarvis/issues</Support>
   <Project>https://github.com/hoktaar/mini-jarvis</Project>
   <ReadMe>https://github.com/hoktaar/mini-jarvis/blob/main/docs/UNRAID.md</ReadMe>
-  <Overview>Mini-Jarvis – deutschsprachiger Sprachassistent für den eigenen Server. Lokal mit NVIDIA-GPU: Whisper (Spracherkennung), Ollama (Sprachmodell), Piper (Sprachausgabe). Cloud-Dienste optional. Web-Dashboard, Verwaltung, CYD/ESP32-Displays (Firmware per USB aus dem Browser, Updates per WLAN), PWA fürs Handy, Telegram und Matrix, Home Assistant, Kalender, Timer und Wecker. HTTPS auf Port 8443 mit eigener CA (nötig für Mikrofon und USB-Flasher im Browser).</Overview>
+  <Overview>Mini-Jarvis – deutschsprachiger Sprachassistent für den eigenen Server. Variante OHNE GPU: Sprachmodell aus der Cloud (Claude, GPT, Gemini …) oder von einem externen Ollama; Spracherkennung per Cloud oder Whisper auf der CPU. Cloud-Dienste optional. Web-Dashboard, Verwaltung, CYD/ESP32-Displays (Firmware per USB aus dem Browser, Updates per WLAN), PWA fürs Handy, Telegram und Matrix, Home Assistant, Kalender, Timer und Wecker. HTTPS auf Port 8443 mit eigener CA (nötig für Mikrofon und USB-Flasher im Browser).</Overview>
   <Category>HomeAutomation: Tools: AI:</Category>
   <WebUI>https://[IP]:[PORT:8443]/</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/unraid/mini-jarvis.xml</TemplateURL>
+  <TemplateURL>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/unraid/mini-jarvis-ohne-gpu.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/server/jarvis/web/icons/icon-192.png</Icon>
-  <ExtraParams>--runtime=nvidia --stop-timeout=30</ExtraParams>
-  <Requires>Plugin „Nvidia-Driver“ (Community Applications) und eine NVIDIA-GPU mit mindestens 8 GB VRAM.</Requires>
+  <ExtraParams>--stop-timeout=30</ExtraParams>
   <Changes>### 0.3.0&#xD;
 - HUD-Dashboard und neue Verwaltung&#xD;
 - CYD-Firmware per USB aus dem Browser, Updates per WLAN&#xD;
@@ -30,11 +29,9 @@
   <Config Name="Modelle" Target="/models" Default="/mnt/cache/appdata/mini-jarvis/models" Mode="rw" Description="Ollama-, Whisper-, Piper- und Embedding-Modelle (mehrere GB). Am besten auf dem Cache-Pool." Type="Path" Display="always" Required="true">/mnt/cache/appdata/mini-jarvis/models</Config>
   <Config Name="Skripte (nur lesen)" Target="/scripts" Default="/mnt/user/appdata/mini-jarvis/scripts" Mode="ro" Description="Eigene Skripte, die Jarvis nach Freigabe in scripts.yaml ausführen darf." Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/scripts</Config>
   <Config Name="Docker-Socket (nur für den Filter-Proxy)" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="rw" Description="Optional: Container-Status und Neustart per Sprache, nur für Container aus whitelist.yaml." Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
-  <Config Name="Eingebettetes Ollama" Target="JARVIS_EMBEDDED_OLLAMA" Default="auto" Mode="" Description="auto = starten, wenn config.yaml ein lokales Ollama nutzt; false = externes Ollama oder nur Cloud." Type="Variable" Display="advanced" Required="false">auto</Config>
+  <Config Name="Eingebettetes Ollama" Target="JARVIS_EMBEDDED_OLLAMA" Default="false" Mode="" Description="auto = starten, wenn config.yaml ein lokales Ollama nutzt; false = externes Ollama oder nur Cloud." Type="Variable" Display="advanced" Required="false">false</Config>
   <Config Name="Eingebettetes SearXNG" Target="JARVIS_EMBEDDED_SEARXNG" Default="auto" Mode="" Description="Lokale Websuche. false, wenn Brave/Tavily oder ein eigener SearXNG genutzt wird." Type="Variable" Display="advanced" Required="false">auto</Config>
   <Config Name="Öffentliche Adresse (optional)" Target="JARVIS_PUBLIC_URL" Default="" Mode="" Description="Für QR-Codes hinter einem Reverse-Proxy, z. B. https://jarvis.example.de" Type="Variable" Display="advanced" Required="false"></Config>
-  <Config Name="NVIDIA_VISIBLE_DEVICES" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Description="GPU-UUID oder all (nvidia-smi -L)" Type="Variable" Display="advanced" Required="false">all</Config>
-  <Config Name="NVIDIA_DRIVER_CAPABILITIES" Target="NVIDIA_DRIVER_CAPABILITIES" Default="all" Mode="" Description="" Type="Variable" Display="advanced" Required="false">all</Config>
   <Config Name="Anthropic API-Key (optional)" Target="JARVIS_ANTHROPIC_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="OpenAI API-Key (optional)" Target="JARVIS_OPENAI_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="Google API-Key (Gemini) (optional)" Target="JARVIS_GOOGLE_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>

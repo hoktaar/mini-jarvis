@@ -42,6 +42,15 @@
 - CI: Lint, Tests, Router-Auswertung, Firmware-Build mit Paket und PC-Vorschau, Image mit Rauchtest ohne GPU,
   Tags `latest`, Version und Commit.
 
+**Unraid und Doku**
+- `unraid/install.sh`: erkennt die GPU, legt Ordner an, lädt Beispiel-Skripte und schreibt eine ausgefüllte
+  Vorlage (mit IP für das Zertifikat); Vorlagen mit und ohne GPU, nutzbar auch als Template-Repository.
+- Ausführliche Anleitung (Zertifikat je Betriebssystem, Profile je GPU, Updates, Backup, Fehlerbehebung),
+  README mit Animationen, Screenshots, Verkabelungsgrafik und Einkaufsliste.
+- Router: Bonus für erkannte Angaben wächst mit der Zahl der Pflichtangaben („Erinnere mich um 22 Uhr an den
+  Müll“ geht jetzt direkt über den Schnellweg).
+- Dashboard: Eingabefeld bleibt auch bei niedrigen Bildschirmen sichtbar (Vorschläge einzeilig).
+
 ## 0.2.1 – Image-Build
 
 - SearXNG-Installation im Dockerfile korrigiert (Requirements vor Editable-Install).

@@ -468,9 +468,13 @@ dialog.sheet::backdrop { background: rgba(2, 6, 14, .65); backdrop-filter: blur(
   body[data-view="dashboard"] .panel.shrink { flex: 0 1 auto; min-height: 118px; }
   body[data-view="dashboard"] .panel.shrink > .list { min-height: 0; overflow-y: auto; }
   body[data-view="dashboard"] .panel.feed-panel { min-height: 200px; }
-  body[data-view="dashboard"] .hero { --reactor: clamp(140px, calc(100vh - 640px), 270px); }
-  body[data-view="dashboard"] .chat { min-height: 170px; flex: 1 1 0; }
-  body[data-view="dashboard"] .chat .log { flex: 1; max-height: none; min-height: 50px; }
+  body[data-view="dashboard"] .hero { --reactor: clamp(124px, calc(100vh - 650px), 270px); }
+  body[data-view="dashboard"] .chat { min-height: 150px; flex: 1 1 0; overflow: hidden; }
+  body[data-view="dashboard"] .chat .log { flex: 1 1 0; max-height: none; min-height: 0; }
+  /* Eingabe immer sichtbar: Vorschläge einzeilig und seitlich scrollbar */
+  body[data-view="dashboard"] .chat .suggestions { flex: none; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  body[data-view="dashboard"] .chat .suggestions .chip { white-space: nowrap; }
+  body[data-view="dashboard"] .chat .composer { flex: none; }
 }
 @media (min-width: 1100px) and (max-height: 860px) {
   body[data-view="dashboard"] .hint { display: none; }

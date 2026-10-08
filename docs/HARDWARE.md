@@ -16,6 +16,10 @@ aktiv low), LDR (34), Lautsprecher-Ausgang mit Verstärker an GPIO 26 (DAC).
 
 \* GPIO 21 ist je nach Revision die Hintergrundbeleuchtung – nicht verwenden.
 
+## Verkabelung
+
+![Verkabelung CYD, INMP441 und Lautsprecher](images/verkabelung.svg)
+
 ## Mikrofon INMP441
 
 | INMP441 | CYD |
