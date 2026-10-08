@@ -3,43 +3,305 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1b2a33">
+  <meta name="theme-color" content="#050b16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Jarvis – dein lokaler KI-Assistent">
   <title>Jarvis</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <main class="app">
-    <header class="bar">
-      <h1>Jarvis</h1>
-      <nav><a href="admin.html" class="link">Verwaltung</a> <button id="settings-btn" class="ghost" aria-label="Gerät einrichten">Gerät</button></nav>
+<body data-view="dashboard">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <radialGradient id="g-core" cx="50%" cy="45%" r="55%">
+        <stop offset="0" stop-color="#e8fbff"/><stop offset=".35" stop-color="#7fe4ff"/>
+        <stop offset=".75" stop-color="#1f8fe0"/><stop offset="1" stop-color="#0a3b8f"/>
+      </radialGradient>
+      <filter id="f-glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm6-3a6 6 0 0 1-12 0M12 18v3m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-6 16-2.5-6.5L4 12Z" fill="currentColor"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4v-9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-dash" viewBox="0 0 24 24"><path d="M4 13h7V4H4v9Zm9 7h7v-9h-7v9ZM4 20h7v-5H4v5Zm9-11h7V4h-7v5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4V5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tasks" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-system" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 20h6M12 16v4M8 12l2.5-3 2 2L16 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-1.6.9 1.6-1.8 3.1-1.8-.2a7 7 0 0 1-1.6.9L14.4 21h-3.6l-.7-1.7a7 7 0 0 1-1.6-.9l-1.8.2-1.8-3.1.9-1.6a7 7 0 0 1 0-1.8l-.9-1.6 1.8-3.1 1.8.2a7 7 0 0 1 1.6-.9L10.8 3h3.6l.7 1.7a7 7 0 0 1 1.6.9l1.8-.2 1.8 3.1-.9 1.6a7 7 0 0 1 0 1.8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-admin" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6l-8-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Zm4 4a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V8a4 4 0 0 1 7.5-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-8A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-rain" viewBox="0 0 24 24"><path d="M7 15h10a4 4 0 0 0 .6-8A6 6 0 0 0 6.2 6.4 4.3 4.3 0 0 0 7 15Zm1 3-1 2m5-2-1 2m5-2-1 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 9v4l2.5 2M9 2h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-alarm" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 10v3l2 1.5M4 5l3-2.5M20 5l-3-2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-event" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 10h16M8 3v4m8-4v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V17h5v-1.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8m5.7-5.7a8 8 0 1 1-11.4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-thermo" viewBox="0 0 24 24"><path d="M10 14V5a2 2 0 1 1 4 0v9a4 4 0 1 1-4 0Z" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-garage" viewBox="0 0 24 24"><path d="M3 10 12 4l9 6v10H3V10Zm4 4h10M7 17h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 11 5-3v8l-5-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l11-2v12M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3Zm11-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 19v2h6v-2" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-fan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 10c0-4 1-6 4-6s2 4-2 6m-4 2c-4 0-6 1-6 4s4 2 6-2m4 0c0 4-1 6-4 6s-2-4 2-6" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 16a8 8 0 1 1 16 0M12 16l4-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6l-8-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-robot" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V4m-3 9h.01M15 13h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15m0 5v-5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.3 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.3-3.5-8.5s1-6 3.5-8.5Z" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <div class="shell">
+    <!-- ================= Seitenleiste ================= -->
+    <aside class="sidebar" aria-label="Navigation">
+      <a class="logo" href="/" aria-label="Jarvis – Startseite">
+        <svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/>
+          <circle cx="20" cy="20" r="12" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3"/>
+          <circle cx="20" cy="20" r="6" fill="url(#g-core)"/>
+        </svg>
+        <span><b>JARVIS</b><small>Dein KI-Assistent</small></span>
+      </a>
+      <nav class="nav">
+        <button data-view="dashboard" title="Dashboard" aria-current="page"><svg><use href="#i-dash"/></svg><span>Dashboard</span></button>
+        <button data-view="chat" title="Chat"><svg><use href="#i-chat"/></svg><span>Chat</span></button>
+        <button data-view="tasks" title="Aufgaben"><svg><use href="#i-tasks"/></svg><span>Aufgaben</span></button>
+        <button data-view="home" title="Smarthome"><svg><use href="#i-home"/></svg><span>Smarthome</span></button>
+        <button data-view="systems" title="Systeme"><svg><use href="#i-system"/></svg><span>Systeme</span></button>
+        <button id="nav-settings" class="nav-extra" title="Einstellungen"><svg><use href="#i-settings"/></svg><span>Einstellungen</span></button>
+        <a href="admin.html" class="nav-extra" title="Verwaltung"><svg><use href="#i-admin"/></svg><span>Verwaltung</span></a>
+      </nav>
+      <div class="side-foot">
+        <div class="disk" id="disk" hidden>
+          <svg viewBox="0 0 64 64" class="ring-gauge" aria-hidden="true">
+            <circle cx="32" cy="32" r="26" class="track"/><circle cx="32" cy="32" r="26" class="fill" id="disk-fill" pathLength="100" stroke-dasharray="0 100"/>
+          </svg>
+          <div><b id="disk-pct">–</b><span>Speicher</span><small id="disk-detail"></small></div>
+        </div>
+        <div class="online-card" id="online-card" data-state="offline">
+          <span class="dot"></span><div><b>JARVIS <span id="online-word">offline</span></b><small id="online-detail">Nicht verbunden</small></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ================= Kopfzeile ================= -->
+    <header class="topbar">
+      <a class="logo compact" href="/" aria-label="Jarvis">
+        <svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="12" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3"/><circle cx="20" cy="20" r="6" fill="url(#g-core)"/></svg>
+        <b>JARVIS</b>
+      </a>
+      <form id="cmd" class="cmd" role="search">
+        <svg><use href="#i-search"/></svg>
+        <input id="cmd-input" type="search" placeholder="Frag Jarvis oder gib einen Befehl ein …" aria-label="Frag Jarvis" autocomplete="off" enterkeyhint="send">
+        <kbd>Strg K</kbd>
+      </form>
+      <div class="weather" id="weather" hidden><svg id="weather-icon"><use href="#i-cloud"/></svg><div><b id="weather-temp"></b><span id="weather-desc"></span><small id="weather-place"></small></div></div>
+      <div class="clock"><small id="clock-date"></small><b id="clock-time"></b></div>
+      <div class="top-actions">
+        <button id="private-btn" class="icon-btn" aria-pressed="false" title="Privatmodus" aria-label="Privatmodus"><svg><use href="#i-unlock"/></svg></button>
+        <div class="bell-wrap">
+          <button id="bell" class="icon-btn" aria-label="Benachrichtigungen" aria-expanded="false" aria-controls="bell-pop"><svg><use href="#i-bell"/></svg><span class="badge" id="bell-badge" hidden></span></button>
+          <div class="popover" id="bell-pop" hidden></div>
+        </div>
+        <button id="avatar" class="avatar" data-state="offline" aria-label="Verbindung" title="Getrennt"><span class="core"></span></button>
+      </div>
     </header>
 
-    <section class="core" aria-live="polite">
-      <div id="ring" class="ring" data-state="idle" aria-hidden="true">
-        <span></span><span></span><span></span>
+    <div id="banners" class="banners" aria-live="polite"></div>
+
+    <!-- ================= Inhalt ================= -->
+    <main class="grid" id="grid">
+      <div class="col col-left">
+        <section class="panel" data-in="dashboard systems" data-order="6" aria-labelledby="h-status">
+          <header><h2 id="h-status"><svg><use href="#i-globe"/></svg>Globaler Status</h2><span class="status-tag" id="status-tag"><span class="dot"></span><span>…</span></span></header>
+          <svg id="netmap" class="netmap" viewBox="0 0 320 170" role="img" aria-label="Geräte im Netz"></svg>
+          <div class="kpis">
+            <div><b id="kpi-online">–</b><span>Aktive Geräte</span></div>
+            <div><b id="kpi-rooms">–</b><span>Räume</span></div>
+            <div><b id="kpi-warn">–</b><span>Hinweise</span></div>
+          </div>
+        </section>
+        <section class="panel" data-in="dashboard systems" data-order="7" aria-labelledby="h-res">
+          <header><div><h2 id="h-res"><svg><use href="#i-system"/></svg>Systemressourcen</h2><small>Echtzeit-Leistung</small></div></header>
+          <div class="meters" id="meters"></div>
+        </section>
+        <section class="panel grow" data-in="dashboard chat" data-order="9" aria-labelledby="h-recent">
+          <header><h2 id="h-recent"><svg><use href="#i-chat"/></svg>Letzte Anfragen</h2></header>
+          <ul class="list recent" id="recent"><li class="empty">Noch keine Anfragen.</li></ul>
+        </section>
       </div>
-      <p id="state" class="state">Bereit</p>
-    </section>
 
-    <ol id="log" class="log"></ol>
+      <div class="col col-center">
+        <section class="panel hero" data-in="dashboard chat" data-m="dashboard chat" data-order="1" aria-label="Jarvis">
+          <div class="hero-head">
+            <div class="hero-title">
+              <span id="greeting">Hallo</span>
+              <h1>JARVIS</h1>
+              <p>Wie kann ich dir helfen?</p>
+            </div>
+            <div class="hero-clock"><span id="hero-date"></span><b id="hero-time"></b></div>
+          </div>
+          <div class="hero-body">
+            <ul class="states" id="states" aria-label="Zustand">
+              <li data-s="listening">Zuhören</li><li data-s="thinking">Denken</li><li data-s="speaking">Antworten</li><li data-s="idle">Bereit</li>
+            </ul>
+            <button id="orb" class="reactor" data-state="offline" aria-describedby="state-label" title="Antippen zum Sprechen, halten für Push-to-Talk">
+              <svg viewBox="0 0 300 300" aria-hidden="true">
+                <circle class="r-dots" cx="150" cy="150" r="142"/>
+                <circle class="r-ticks" cx="150" cy="150" r="130"/>
+                <g class="r-arcs spin">
+                  <path d="M150 34a116 116 0 0 1 82 34" /><path d="M266 150a116 116 0 0 1-34 82"/><path d="M150 266a116 116 0 0 1-82-34"/><path d="M34 150a116 116 0 0 1 34-82"/>
+                </g>
+                <circle class="r-dash spin-rev" cx="150" cy="150" r="98"/>
+                <circle class="r-inner" cx="150" cy="150" r="76"/>
+                <circle class="r-ring" cx="150" cy="150" r="58" filter="url(#f-glow)"/>
+                <circle class="r-core" cx="150" cy="150" r="46" fill="url(#g-core)" filter="url(#f-glow)"/>
+              </svg>
+            </button>
+            <ul class="caps" id="caps" aria-label="Fähigkeiten"></ul>
+          </div>
+          <canvas id="wave" class="wave" aria-hidden="true"></canvas>
+          <button id="listen" class="listen-pill" aria-pressed="false"><svg><use href="#i-mic"/></svg><span id="state-label">Nicht verbunden</span></button>
+          <p id="hint" class="hint"></p>
+        </section>
 
-    <form id="composer" class="composer" autocomplete="off">
-      <button id="talk" type="button" class="talk" aria-pressed="false">Sprechen</button>
-      <input id="input" type="text" placeholder="Oder schreib Jarvis etwas" aria-label="Nachricht an Jarvis">
-      <button type="submit" class="ghost">Senden</button>
+        <div class="quick" data-in="dashboard" data-m="dashboard" data-order="2" role="toolbar" aria-label="Schnellaktionen">
+          <button data-prefill="Such im Internet nach " title="Im Web suchen"><svg><use href="#i-search"/></svg>Websuche</button>
+          <button data-say="Wie wird das Wetter heute?"><svg><use href="#i-sun"/></svg>Wetter</button>
+          <button data-prefill="Stell einen Timer auf "><svg><use href="#i-timer"/></svg>Timer</button>
+          <button data-goto="home"><svg><use href="#i-home"/></svg>Zuhause</button>
+          <button data-say="Neues Thema"><svg><use href="#i-new"/></svg>Neues Thema</button>
+        </div>
+
+        <section class="panel chat grow" data-in="dashboard chat" data-m="dashboard chat" data-order="3" aria-label="Gespräch">
+          <ol id="log" class="log" aria-live="polite"></ol>
+          <div id="suggestions" class="suggestions">
+            <button class="chip">Wie spät ist es?</button>
+            <button class="chip">Timer fünf Minuten</button>
+            <button class="chip">Wie wird das Wetter morgen?</button>
+            <button class="chip">Was kannst du?</button>
+          </div>
+          <form id="composer" class="composer" autocomplete="off">
+            <input id="input" type="text" placeholder="Nachricht eingeben oder Befehl erteilen …" aria-label="Nachricht an Jarvis" enterkeyhint="send">
+            <button type="button" id="talk" class="mic" aria-pressed="false" aria-label="Sprechen"><svg><use href="#i-mic"/></svg></button>
+            <button class="send" aria-label="Senden"><svg><use href="#i-send"/></svg></button>
+          </form>
+        </section>
+      </div>
+
+      <div class="col col-right">
+        <section class="panel" data-in="dashboard home" data-order="5" aria-labelledby="h-home">
+          <header><h2 id="h-home"><svg><use href="#i-home"/></svg>Smarthome</h2><span class="status-tag" id="home-tag" hidden><span class="dot"></span><span></span></span></header>
+          <div class="tiles" id="tiles"></div>
+          <button class="link more" id="home-more" data-goto="home" hidden>Alle anzeigen</button>
+        </section>
+        <section class="panel shrink" data-in="dashboard tasks" data-m="dashboard tasks" data-order="4" aria-labelledby="h-tasks">
+          <header><h2 id="h-tasks"><svg><use href="#i-tasks"/></svg>Bevorstehend</h2><button class="link" data-goto="tasks">Alle anzeigen</button></header>
+          <ul class="list tasks" id="tasks"><li class="empty">Keine Timer, Wecker oder Termine.</li></ul>
+        </section>
+        <section class="panel grow feed-panel" data-in="dashboard systems" data-order="8" aria-labelledby="h-feed">
+          <header><h2 id="h-feed"><svg><use href="#i-auto"/></svg>Live-Datenfeed</h2><span class="status-tag ok"><span class="dot"></span><span>Echtzeit</span></span></header>
+          <ul class="feed" id="feed"><li class="empty">Noch keine Ereignisse.</li></ul>
+          <h3 class="sub-h">Netzwerkaktivität</h3>
+          <div class="net">
+            <figure class="stat-tile"><b id="net-down">–</b><figcaption>Download</figcaption><svg id="spark-down" class="spark" viewBox="0 0 120 36" role="img" aria-label="Download-Verlauf"></svg></figure>
+            <figure class="stat-tile"><b id="net-up">–</b><figcaption>Upload</figcaption><svg id="spark-up" class="spark" viewBox="0 0 120 36" role="img" aria-label="Upload-Verlauf"></svg></figure>
+          </div>
+        </section>
+        <section class="panel" data-in="systems" data-order="10" aria-labelledby="h-devices">
+          <header><h2 id="h-devices"><svg><use href="#i-dash"/></svg>Geräte</h2></header>
+          <ul class="list devices" id="devices"></ul>
+        </section>
+      </div>
+    </main>
+
+    <!-- Mobile Navigation -->
+    <nav class="tabbar" aria-label="Bereiche">
+      <button data-view="dashboard" aria-current="page"><svg><use href="#i-dash"/></svg><span>Jarvis</span></button>
+      <button data-view="tasks"><svg><use href="#i-tasks"/></svg><span>Aufgaben</span></button>
+      <button data-view="home"><svg><use href="#i-home"/></svg><span>Zuhause</span></button>
+      <button data-view="systems"><svg><use href="#i-system"/></svg><span>System</span></button>
+      <button id="tab-settings"><svg><use href="#i-settings"/></svg><span>Mehr</span></button>
+    </nav>
+  </div>
+
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+  <div id="alarm" class="alarm" role="alertdialog" aria-modal="true" aria-labelledby="alarm-title" hidden>
+    <div class="alarm-card">
+      <svg class="alarm-icon"><use href="#i-alarm"/></svg>
+      <h2 id="alarm-title">Wecker</h2>
+      <p id="alarm-text"></p>
+      <div class="alarm-actions">
+        <button id="alarm-snooze" class="btn secondary big">Schlummern · 5 min</button>
+        <button id="alarm-stop" class="btn danger big">Stopp</button>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="onboarding" class="sheet" aria-labelledby="ob-title">
+    <form method="dialog" class="sheet-body">
+      <svg class="ob-logo" viewBox="0 0 40 40" width="64" height="64" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="#3fd0ff" stroke-width="1.5" opacity=".45"/><circle cx="20" cy="20" r="12" fill="none" stroke="#3fd0ff" stroke-width="2" stroke-dasharray="5 3"/><circle cx="20" cy="20" r="6" fill="url(#g-core)"/></svg>
+      <h2 id="ob-title">Willkommen bei Jarvis</h2>
+      <p class="muted">Verbinde dieses Gerät mit deinem Jarvis-Server.</p>
+      <ol class="steps">
+        <li>Öffne in der <a href="admin.html">Verwaltung</a> „Gerät hinzufügen“ und wähle <b>Browser / Handy</b>.</li>
+        <li>Scanne den QR-Code mit diesem Gerät – oder füge den Code unten ein.</li>
+      </ol>
+      <label class="field">Geräte-Code
+        <input id="ob-token" type="password" autocomplete="off" placeholder="Code aus der Verwaltung" required>
+      </label>
+      <menu class="sheet-actions">
+        <button value="cancel" class="btn ghost" formnovalidate>Später</button>
+        <button id="ob-save" value="save" class="btn primary">Verbinden</button>
+      </menu>
     </form>
+  </dialog>
 
-    <dialog id="settings">
-      <form method="dialog" class="settings">
-        <h2>Gerät verbinden</h2>
-        <p>Lege in der Geräteverwaltung ein Gerät vom Typ <em>pwa</em> an und trage hier sein Token ein.</p>
-        <label>Geräte-Token <input id="token" type="password" required></label>
-        <menu><button value="cancel" class="ghost">Abbrechen</button><button id="save" value="save">Speichern</button></menu>
-      </form>
-    </dialog>
-  </main>
+  <dialog id="settings" class="sheet" aria-labelledby="st-title">
+    <form method="dialog" class="sheet-body">
+      <h2 id="st-title">Einstellungen</h2>
+      <fieldset class="group">
+        <legend>Sprechen</legend>
+        <label class="switch"><input id="opt-handsfree" type="checkbox"><span>Freisprechen <small>Mikrofon bleibt an, du kannst Jarvis unterbrechen</small></span></label>
+        <label class="switch"><input id="opt-speak" type="checkbox"><span>Getippte Fragen vorlesen</span></label>
+      </fieldset>
+      <fieldset class="group">
+        <legend>Anzeige</legend>
+        <label class="switch"><input id="opt-details" type="checkbox"><span>Technische Details <small>Weg, Absicht, Cloud-Kennzeichnung</small></span></label>
+        <label class="field inline">Design
+          <select id="opt-theme"><option value="">Dunkel (HUD)</option><option value="light">Hell</option></select>
+        </label>
+        <button id="opt-notify" type="button" class="btn secondary">Benachrichtigungen erlauben</button>
+      </fieldset>
+      <fieldset class="group">
+        <legend>Gerät</legend>
+        <p id="st-device" class="muted"></p>
+        <div id="st-cloud" class="notice" hidden></div>
+        <label class="field">Geräte-Code <input id="st-token" type="password" autocomplete="off"></label>
+        <p class="muted small" id="st-version"></p>
+      </fieldset>
+      <menu class="sheet-actions">
+        <a href="admin.html" class="btn ghost">Verwaltung</a>
+        <button value="save" class="btn primary">Fertig</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="app.js" type="module"></script>
 </body>
 </html>

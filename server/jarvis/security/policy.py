@@ -18,9 +18,15 @@ class Verdict(str, Enum):
 class TurnState:
     """Zustand eines Gesprächsschritts (wird pro Nutzeräußerung zurückgesetzt)."""
 
-    tainted: bool = False            # Web/RSS-Inhalte wurden gelesen
+    tainted: bool = False            # Web/RSS-Inhalte wurden gelesen (oder stehen noch im Kontext)
     private_mode: bool = False       # alles lokal erzwingen
     notes: list[str] = field(default_factory=list)
+    started: float = 0.0             # time.monotonic() bei Beginn des Schritts
+    silent: bool = False             # getippte Frage ohne Sprachausgabe
+    provider: str = "local"          # welches LLM antwortet
+    route: str = ""
+    intent: str = ""
+    user_stopped: float = 0.0        # Ende der Nutzeräußerung (für die Latenzmessung)
 
 
 @dataclass
@@ -46,8 +52,10 @@ class Policy:
         turn: TurnState,
         script: ScriptMeta | None = None,
     ) -> Verdict:
-        # Kritisches nie über die Cloud, außer ausdrücklich freigegeben.
-        if ctx.provider != "local" and tool.risk not in self.cloud_allowed_risks:
+        # Kritisches nie über die Cloud, außer ausdrücklich freigegeben. Privatmodus: gar keine Cloud.
+        if ctx.provider != "local" and (tool.risk not in self.cloud_allowed_risks or turn.private_mode):
+            return Verdict.DENY
+        if turn.private_mode and getattr(tool, "cloud", False):
             return Verdict.DENY
         if tool.risk == "read":
             return Verdict.ALLOW

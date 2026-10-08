@@ -1,0 +1,12 @@
+.git
+**/__pycache__
+**/*.pyc
+data/
+models/
+firmware/cyd/.pio
+firmware/cyd/.vscode
+server/build
+server/*.egg-info
+docs/
+clients/
+*.gif

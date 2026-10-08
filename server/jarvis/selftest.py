@@ -2,6 +2,8 @@
 
     python -m jarvis.selftest --url ws://192.168.1.144:8080/ws/cyd --token <cyd-token> frage.wav
 
+Braucht die Extras: pip install mini-jarvis[selftest]
+
 Schickt Push-to-Talk, streamt die Aufnahme in Echtzeit (16 kHz PCM16),
 sammelt Zustände/Texte und speichert die gesprochene Antwort als antwort.wav.
 """
@@ -35,17 +37,21 @@ async def run(url: str, token: str, wav: str, out: str, timeout: float) -> int:
     silence = bytes(CHUNK * 2)
     answer = bytearray()
     events: list[dict] = []
-    async with websockets.connect(f"{url}?token={token}", max_size=None) as ws:
+    # Token im Header (wie die CYD-Firmware) – nicht in der URL, damit es in keinem Log landet.
+    async with websockets.connect(url, max_size=None, additional_headers={"Authorization": f"Bearer {token}"}) as ws:
         await ws.send(json.dumps({"type": "hello", "fw": "selftest", "board": "cyd", "caps": ["mic", "speaker"]}))
         await ws.send(json.dumps({"type": "ptt", "value": "start"}))
 
         async def sender():
             for _ in range(15):                     # 300 ms Vorlauf
-                await ws.send(silence); await asyncio.sleep(0.02)
+                await ws.send(silence)
+                await asyncio.sleep(0.02)
             for i in range(0, len(pcm), CHUNK * 2):
-                await ws.send(pcm[i : i + CHUNK * 2]); await asyncio.sleep(0.02)
+                await ws.send(pcm[i : i + CHUNK * 2])
+                await asyncio.sleep(0.02)
             for _ in range(75):                     # 1,5 s Stille → Satzende
-                await ws.send(silence); await asyncio.sleep(0.02)
+                await ws.send(silence)
+                await asyncio.sleep(0.02)
             await ws.send(json.dumps({"type": "ptt", "value": "stop"}))
 
         send_task = asyncio.create_task(sender())
@@ -53,7 +59,7 @@ async def run(url: str, token: str, wav: str, out: str, timeout: float) -> int:
         while time.monotonic() - start < timeout:
             try:
                 msg = await asyncio.wait_for(ws.recv(), 0.5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if spoke and last_audio and time.monotonic() - last_audio > 1.5:
                     break
                 continue

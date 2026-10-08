@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" width="900" height="500" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif">
+  <title>Verkabelung CYD + INMP441 + Lautsprecher</title>
+  <rect width="900" height="500" rx="16" fill="#0b1a33"/>
+  <text x="32" y="40" fill="#dcecff" font-size="20" font-weight="700" letter-spacing="1">Verkabelung: CYD (Rückseite) · Mikrofon INMP441 · Lautsprecher</text>
+
+  <!-- CYD-Platine -->
+  <rect x="40" y="70" width="420" height="300" rx="12" fill="#e9b928" stroke="#8a6a10" stroke-width="2"/>
+  <text x="60" y="98" fill="#3b2d00" font-size="15" font-weight="700">ESP32-2432S028 (CYD)</text>
+  <rect x="190" y="130" width="130" height="96" rx="4" fill="#3a3f47" stroke="#22262b"/>
+  <text x="255" y="174" fill="#e6e6e6" font-size="13" text-anchor="middle">ESP32-WROOM-32</text>
+  <text x="255" y="194" fill="#aab" font-size="11" text-anchor="middle">4 MB · kein PSRAM</text>
+  <rect x="28" y="250" width="26" height="40" rx="3" fill="#bfc5cc" stroke="#7c838b"/>
+  <text x="66" y="275" fill="#3b2d00" font-size="12">USB</text>
+
+  <!-- CN1 -->
+  <rect x="356" y="104" width="88" height="112" rx="5" fill="#f4f1e8" stroke="#8a6a10"/>
+  <text x="400" y="122" fill="#3b2d00" font-size="12" font-weight="700" text-anchor="middle">CN1</text>
+  <g font-size="12" fill="#3b2d00">
+    <text x="366" y="140">GND</text><text x="366" y="166">IO22</text><text x="366" y="192">IO27</text>
+  </g>
+  <!-- P3 -->
+  <rect x="356" y="236" width="88" height="112" rx="5" fill="#f4f1e8" stroke="#8a6a10"/>
+  <text x="400" y="254" fill="#3b2d00" font-size="12" font-weight="700" text-anchor="middle">P3</text>
+  <g font-size="12" fill="#3b2d00">
+    <text x="366" y="272">GND</text><text x="366" y="298">IO35</text><text x="366" y="324">IO22</text>
+  </g>
+  <text x="366" y="214" fill="#3b2d00" font-size="12">3,3 V</text>
+  <text x="366" y="342" fill="#8a6a10" font-size="11">IO21 – frei lassen</text>
+
+  <!-- Pins -->
+  <g fill="#c9a227" stroke="#5b4508" stroke-width="2">
+    <circle cx="430" cy="136" r="6"/><circle cx="430" cy="162" r="6"/><circle cx="430" cy="188" r="6"/><circle cx="430" cy="210" r="6"/>
+    <circle cx="430" cy="268" r="6"/><circle cx="430" cy="294" r="6"/><circle cx="430" cy="320" r="6"/>
+  </g>
+
+  <!-- SPEAK -->
+  <rect x="96" y="318" width="96" height="40" rx="5" fill="#f4f1e8" stroke="#8a6a10"/>
+  <text x="144" y="334" fill="#3b2d00" font-size="12" font-weight="700" text-anchor="middle">SPEAK</text>
+  <g fill="#c9a227" stroke="#5b4508" stroke-width="2"><circle cx="128" cy="348" r="5"/><circle cx="160" cy="348" r="5"/></g>
+
+  <!-- INMP441 -->
+  <rect x="640" y="110" width="200" height="216" rx="12" fill="#4b2f8f" stroke="#2c1a5c" stroke-width="2"/>
+  <text x="740" y="138" fill="#ece6ff" font-size="15" font-weight="700" text-anchor="middle">INMP441</text>
+  <circle cx="770" cy="226" r="34" fill="#c0c4cc" stroke="#7a7f88" stroke-width="3"/>
+  <circle cx="770" cy="226" r="6" fill="#2b2f36"/>
+  <g font-size="12" fill="#ece6ff">
+    <text x="664" y="160">SCK</text><text x="664" y="190">WS</text><text x="664" y="220">L/R</text>
+    <text x="664" y="250">SD</text><text x="664" y="280">VDD</text><text x="664" y="310">GND</text>
+  </g>
+  <g fill="#c9a227" stroke="#2c1a5c" stroke-width="2">
+    <circle cx="650" cy="156" r="6"/><circle cx="650" cy="186" r="6"/><circle cx="650" cy="216" r="6"/>
+    <circle cx="650" cy="246" r="6"/><circle cx="650" cy="276" r="6"/><circle cx="650" cy="306" r="6"/>
+  </g>
+
+  <!-- Leitungen -->
+  <g fill="none" stroke-width="4" stroke-linecap="round">
+    <path d="M436 162 C 540 162, 540 156, 644 156" stroke="#f5a623"/>
+    <path d="M436 188 C 540 188, 540 186, 644 186" stroke="#2ecc71"/>
+    <path d="M436 268 C 540 268, 540 216, 644 216" stroke="#95a5a6"/>
+    <path d="M436 294 C 540 294, 540 246, 644 246" stroke="#3d8bfd"/>
+    <path d="M436 210 C 540 210, 540 276, 644 276" stroke="#e74c3c"/>
+    <path d="M436 136 C 560 136, 560 306, 644 306" stroke="#111" stroke-dasharray="0" />
+    <path d="M436 136 C 560 136, 560 306, 644 306" stroke="#d0d6e0" stroke-width="1.5" stroke-dasharray="6 6"/>
+  </g>
+
+  <!-- Lautsprecher -->
+  <g fill="none" stroke-width="4" stroke-linecap="round">
+    <path d="M128 353 L 128 410" stroke="#e74c3c"/>
+    <path d="M160 353 L 160 410" stroke="#111"/>
+    <path d="M160 353 L 160 410" stroke="#d0d6e0" stroke-width="1.5" stroke-dasharray="6 6"/>
+  </g>
+  <rect x="104" y="410" width="80" height="54" rx="8" fill="#2b2f36" stroke="#7a7f88" stroke-width="2"/>
+  <circle cx="144" cy="437" r="18" fill="#454b55" stroke="#9aa1ab" stroke-width="2"/>
+  <circle cx="144" cy="437" r="6" fill="#9aa1ab"/>
+  <text x="200" y="432" fill="#dcecff" font-size="14" font-weight="700">Lautsprecher 8 Ω, 1–2 W</text>
+  <text x="200" y="452" fill="#a9c3e6" font-size="12">an „SPEAK“ · Stecker JST 1,25 mm</text>
+
+  <!-- Legende -->
+  <g font-size="13" fill="#dcecff">
+    <rect x="500" y="364" width="370" height="114" rx="10" fill="#10264a" stroke="#1c3e68"/>
+    <text x="516" y="388" font-weight="700">INMP441 → CYD</text>
+    <g font-size="12">
+      <rect x="516" y="398" width="14" height="5" fill="#f5a623"/><text x="538" y="404">SCK → IO22 (CN1)</text>
+      <rect x="516" y="416" width="14" height="5" fill="#2ecc71"/><text x="538" y="422">WS → IO27 (CN1)</text>
+      <rect x="516" y="434" width="14" height="5" fill="#3d8bfd"/><text x="538" y="440">SD → IO35 (P3)</text>
+      <rect x="690" y="398" width="14" height="5" fill="#e74c3c"/><text x="712" y="404">VDD → 3,3 V (CN1)</text>
+      <rect x="690" y="416" width="14" height="5" fill="#d0d6e0"/><text x="712" y="422">GND → GND (CN1)</text>
+      <rect x="690" y="434" width="14" height="5" fill="#95a5a6"/><text x="712" y="440">L/R → GND (P3)</text>
+    </g>
+    <text x="516" y="466" font-size="11" fill="#a9c3e6">Nur 3,3 V! Pinbelegung mit der eigenen Board-Revision abgleichen.</text>
+  </g>
+</svg>

@@ -21,10 +21,13 @@
 #define LED_G 16
 #define LED_B 17
 
-// Mikrofon INMP441 (I2S)
+// Mikrofon INMP441 (I2S, L/R an GND = linker Kanal)
 #define MIC_SCK 22
 #define MIC_WS  27
 #define MIC_SD  35
 
-// Lautsprecher: interner DAC, Kanal 2 = GPIO 26
+// Lautsprecher: interner DAC, GPIO 26 → Verstärker SC8002B → Stecker „SPEAK“
 #define SPEAKER_DAC_GPIO 26
+
+// Taste BOOT (GPIO 0) – beim Einschalten gedrückt halten = Einstellungen löschen
+#define BOOT_BUTTON 0

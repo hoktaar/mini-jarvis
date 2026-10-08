@@ -19,7 +19,7 @@ def make_news_tool(cfg: NewsCfg) -> Tool:
             responses = await asyncio.gather(
                 *(client.get(f.url) for f in cfg.feeds), return_exceptions=True
             )
-        for feed, resp in zip(cfg.feeds, responses):
+        for feed, resp in zip(cfg.feeds, responses, strict=True):
             if isinstance(resp, Exception):
                 continue
             parsed = feedparser.parse(resp.text)

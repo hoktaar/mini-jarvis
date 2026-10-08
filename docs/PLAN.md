@@ -145,18 +145,20 @@ Server-Aktion eine Bestätigung (Schutz vor Prompt-Injection).
 
 | Komponente | Lokal | Extern |
 |---|---|---|
-| LLM | Ollama | Anthropic, OpenAI, Google, Mistral, OpenRouter, OpenAI-kompatibel |
-| STT | faster-whisper | Deepgram, OpenAI u. a. (Pipecat) |
-| TTS | Piper | ElevenLabs, Cartesia u. a. (Pipecat) |
+| LLM | Ollama | Anthropic, OpenAI, Google, Mistral, Groq, OpenRouter, DeepSeek, OpenAI-kompatibel |
+| STT | faster-whisper | OpenAI, Groq, Deepgram, Azure, Google, ElevenLabs |
+| TTS | Piper | OpenAI, ElevenLabs, Cartesia, Deepgram, Azure, Google |
 | System-1 | lokaler Klassifikator | Jev, LLM-Klassifikator |
 | Suche | SearXNG | Brave, Tavily (MCP) |
 | Push | ntfy, Web Push | Firebase |
 | Chat | Matrix | Telegram |
 | Fernzugriff | WireGuard | Tailscale / Headscale |
 
-Regeln: Tool-Freigaben pro Anbieter (Cloud standardmäßig ohne Server-Tools),
-Privatmodus (alles lokal), Wolken-Symbol im Client bei externer Verarbeitung,
-Tages-/Monatsbudget, Schlüssel nur in `secrets.yaml`, nie im Log.
+Regeln: `providers.llm.primary` wählt lokal oder Cloud als Standard, der andere Weg springt bei Ausfall
+ein (beide Richtungen); das lokale Modell ist optional (Betrieb ganz ohne GPU möglich).
+Tool-Freigaben pro Anbieter (Cloud standardmäßig ohne Server-Tools), Privatmodus pro Gerät
+(Sprachmodell und Werkzeuge lokal), Wolken-Symbol im Client bei externer Verarbeitung,
+Tages-/Monatsbudget, Schlüssel nur in `secrets.yaml` oder `JARVIS_<NAME>`, nie im Log.
 
 ## 9. Sicherheit
 
@@ -198,19 +200,19 @@ Mehr in [HARDWARE.md](HARDWARE.md).
 
 ## 12. Phasen
 
-| Phase | Inhalt | Fertig, wenn … |
-|---|---|---|
-| 0 | **Grundgerüst** (dieses Repo) | Tests grün, Container baut |
-| 1 | Pipeline end-to-end, Geräteverwaltung, PWA-Sprachtest, HTTPS | „Hey Jarvis, wie spät ist es?“ im Browser wird gesprochen beantwortet |
-| 2a | Tools: Zeit, Timer, Wetter, News, Websuche (MCP) | alle Tools per Sprache, Timer überleben Neustart |
-| 2b | Router live, Ja/Nein, Cloud-Eskalation, Budget | ≥ 90 % Testsätze richtig, Schnellweg < 1 s |
-| 3 | Docker-MCP, Runner, Bestätigungen, Audit-UI | Test-Skript läuft nur nach Bestätigung |
-| 4 | CYD-Firmware: WLAN-Setup, Audio, Protokoll | Gespräch über den CYD |
-| 5 | Display-UI, Räume, Wake-Word-Schlichtung, OTA | Alltagsbetrieb stabil |
-| 6 | Android-App, WireGuard, ntfy | Gespräch von unterwegs |
-| 7 | Android Auto | Jarvis-Knopf im Auto, Antwort über Autolautsprecher |
-| 8 | Desktop (Tauri) | Hotkey startet Jarvis |
-| 9 | Chat-Bots | Text + Sprachnachricht über Matrix |
+| Phase | Inhalt | Fertig, wenn … | Stand (0.3.0) |
+|---|---|---|---|
+| 0 | **Grundgerüst** (dieses Repo) | Tests grün, Container baut | ✅ |
+| 1 | Pipeline end-to-end, Geräteverwaltung, PWA-Sprachtest, HTTPS | „Hey Jarvis, wie spät ist es?“ im Browser wird gesprochen beantwortet | ✅ HTTPS mit eigener CA, HUD-Dashboard |
+| 2a | Tools: Zeit, Timer, Wetter, News, Websuche (MCP) | alle Tools per Sprache, Timer überleben Neustart | ✅ dazu Kalender (CalDAV), Gedächtnis, Smarthome |
+| 2b | Router live, Ja/Nein, Cloud-Eskalation, Budget | ≥ 90 % Testsätze richtig, Schnellweg < 1 s | ✅ 92,7 % (Trigramm-Klassifikator), Entscheidung in Millisekunden |
+| 3 | Docker-MCP, Runner, Bestätigungen, Audit-UI | Test-Skript läuft nur nach Bestätigung | ✅ |
+| 4 | CYD-Firmware: WLAN-Setup, Audio, Protokoll | Gespräch über den CYD | 🟡 fertig und kompiliert, Hardwaretest offen |
+| 5 | Display-UI, Räume, Wake-Word-Schlichtung, OTA | Alltagsbetrieb stabil | 🟡 Display-UI, USB-Flasher und OTA fertig; Räume/Schlichtung offen |
+| 6 | Android-App, WireGuard, ntfy | Gespräch von unterwegs | 🟡 ntfy fertig, PWA unterwegs nutzbar; App offen |
+| 7 | Android Auto | Jarvis-Knopf im Auto, Antwort über Autolautsprecher | ⬜ |
+| 8 | Desktop (Tauri) | Hotkey startet Jarvis | ⬜ |
+| 9 | Chat-Bots | Text + Sprachnachricht über Matrix | 🟡 Telegram und Matrix implementiert, mit echten Konten ungetestet |
 
 ## 13. Einkaufsliste (Phase 4)
 

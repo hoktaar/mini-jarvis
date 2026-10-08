@@ -4,23 +4,50 @@
   <Repository>ghcr.io/hoktaar/mini-jarvis:latest</Repository>
   <Registry>https://github.com/hoktaar/mini-jarvis/pkgs/container/mini-jarvis</Registry>
   <Network>bridge</Network>
-  <Shell>sh</Shell>
+  <Shell>bash</Shell>
   <Privileged>false</Privileged>
   <Support>https://github.com/hoktaar/mini-jarvis/issues</Support>
   <Project>https://github.com/hoktaar/mini-jarvis</Project>
-  <Overview>Mini-Jarvis: lokaler, deutschsprachiger Sprachassistent (Pipecat, Whisper, Ollama, Piper) für ESP32-Satelliten, PWA, Android und mehr.</Overview>
-  <Category>Tools: HomeAutomation: AI:</Category>
-  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
-  <Icon>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/server/jarvis/web/icon.svg</Icon>
-  <ExtraParams>--runtime=nvidia</ExtraParams>
-  <Config Name="Web-UI und Geräte" Target="8080" Default="8080" Mode="tcp" Type="Port" Display="always" Required="true">8080</Config>
-  <Config Name="Konfiguration" Target="/config" Default="/mnt/user/appdata/mini-jarvis/config" Mode="rw" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/config</Config>
-  <Config Name="Daten" Target="/data" Default="/mnt/user/appdata/mini-jarvis/data" Mode="rw" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/data</Config>
-  <Config Name="Modelle (Cache-Pool empfohlen)" Target="/models" Default="/mnt/cache/appdata/mini-jarvis/models" Mode="rw" Type="Path" Display="always" Required="true">/mnt/cache/appdata/mini-jarvis/models</Config>
-  <Config Name="Skripte (read-only)" Target="/scripts" Default="/mnt/user/appdata/mini-jarvis/scripts" Mode="ro" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/scripts</Config>
-  <Config Name="Docker-Socket (nur für den Filter-Proxy)" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="rw" Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
-  <Config Name="NVIDIA_VISIBLE_DEVICES" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Type="Variable" Display="advanced" Required="true">all</Config>
-  <Config Name="NVIDIA_DRIVER_CAPABILITIES" Target="NVIDIA_DRIVER_CAPABILITIES" Default="all" Mode="" Type="Variable" Display="advanced" Required="true">all</Config>
-  <Config Name="Anthropic API-Key (optional)" Target="JARVIS_ANTHROPIC_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
-  <Config Name="OpenAI API-Key (optional)" Target="JARVIS_OPENAI_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <ReadMe>https://github.com/hoktaar/mini-jarvis/blob/main/docs/UNRAID.md</ReadMe>
+  <Overview>Mini-Jarvis – deutschsprachiger Sprachassistent für den eigenen Server. Lokal mit NVIDIA-GPU: Whisper (Spracherkennung), Ollama (Sprachmodell), Piper (Sprachausgabe). Cloud-Dienste optional. Web-Dashboard, Verwaltung, CYD/ESP32-Displays (Firmware per USB aus dem Browser, Updates per WLAN), PWA fürs Handy, Telegram und Matrix, Home Assistant, Kalender, Timer und Wecker. HTTPS auf Port 8443 mit eigener CA (nötig für Mikrofon und USB-Flasher im Browser).</Overview>
+  <Category>HomeAutomation: Tools: AI:</Category>
+  <WebUI>https://[IP]:[PORT:8443]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/unraid/mini-jarvis.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/server/jarvis/web/icons/icon-192.png</Icon>
+  <ExtraParams>--runtime=nvidia --stop-timeout=30</ExtraParams>
+  <Requires>Plugin „Nvidia-Driver“ (Community Applications) und eine NVIDIA-GPU mit mindestens 8 GB VRAM.</Requires>
+  <Changes>### 0.3.0&#xD;
+- HUD-Dashboard und neue Verwaltung&#xD;
+- CYD-Firmware per USB aus dem Browser, Updates per WLAN&#xD;
+- Cloud-Anbieter gleichwertig zu lokalen Modellen&#xD;
+- HTTPS mit eigener CA (Port 8443)</Changes>
+  <Config Name="Web-UI und Geräte (HTTP)" Target="8080" Default="8080" Mode="tcp" Description="CYD/ESP32-Displays und Apps im Heimnetz verbinden sich hierüber." Type="Port" Display="always" Required="true">8080</Config>
+  <Config Name="Web-UI (HTTPS)" Target="8443" Default="8443" Mode="tcp" Description="Browser mit Mikrofon und USB-Flasher. CA-Zertifikat unter https://[IP]:8443/ca.crt" Type="Port" Display="always" Required="true">8443</Config>
+  <Config Name="Server-Adressen für das Zertifikat" Target="JARVIS_HOSTS" Default="" Mode="" Description="IP und Namen dieses Servers, kommagetrennt, z. B. 192.168.1.144,tower.local" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Zeitzone" Target="TZ" Default="Europe/Berlin" Mode="" Description="" Type="Variable" Display="always" Required="false">Europe/Berlin</Config>
+  <Config Name="Konfiguration" Target="/config" Default="/mnt/user/appdata/mini-jarvis/config" Mode="rw" Description="config.yaml, secrets.yaml, intents.yaml, scripts.yaml – beim ersten Start mit Beispielen gefüllt." Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/config</Config>
+  <Config Name="Daten" Target="/data" Default="/mnt/user/appdata/mini-jarvis/data" Mode="rw" Description="Datenbank (Geräte, Timer, Gedächtnis, Protokolle), Zertifikate, hochgeladene Firmware." Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/data</Config>
+  <Config Name="Modelle" Target="/models" Default="/mnt/cache/appdata/mini-jarvis/models" Mode="rw" Description="Ollama-, Whisper-, Piper- und Embedding-Modelle (mehrere GB). Am besten auf dem Cache-Pool." Type="Path" Display="always" Required="true">/mnt/cache/appdata/mini-jarvis/models</Config>
+  <Config Name="Skripte (nur lesen)" Target="/scripts" Default="/mnt/user/appdata/mini-jarvis/scripts" Mode="ro" Description="Eigene Skripte, die Jarvis nach Freigabe in scripts.yaml ausführen darf." Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/scripts</Config>
+  <Config Name="Docker-Socket (nur für den Filter-Proxy)" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="rw" Description="Optional: Container-Status und Neustart per Sprache, nur für Container aus whitelist.yaml." Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
+  <Config Name="Eingebettetes Ollama" Target="JARVIS_EMBEDDED_OLLAMA" Default="auto" Mode="" Description="auto = starten, wenn config.yaml ein lokales Ollama nutzt; false = externes Ollama oder nur Cloud." Type="Variable" Display="advanced" Required="false">auto</Config>
+  <Config Name="Eingebettetes SearXNG" Target="JARVIS_EMBEDDED_SEARXNG" Default="auto" Mode="" Description="Lokale Websuche. false, wenn Brave/Tavily oder ein eigener SearXNG genutzt wird." Type="Variable" Display="advanced" Required="false">auto</Config>
+  <Config Name="Öffentliche Adresse (optional)" Target="JARVIS_PUBLIC_URL" Default="" Mode="" Description="Für QR-Codes hinter einem Reverse-Proxy, z. B. https://jarvis.example.de" Type="Variable" Display="advanced" Required="false"></Config>
+  <Config Name="NVIDIA_VISIBLE_DEVICES" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Description="GPU-UUID oder all (nvidia-smi -L)" Type="Variable" Display="advanced" Required="false">all</Config>
+  <Config Name="NVIDIA_DRIVER_CAPABILITIES" Target="NVIDIA_DRIVER_CAPABILITIES" Default="all" Mode="" Description="" Type="Variable" Display="advanced" Required="false">all</Config>
+  <Config Name="Anthropic API-Key (optional)" Target="JARVIS_ANTHROPIC_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="OpenAI API-Key (optional)" Target="JARVIS_OPENAI_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Google API-Key (Gemini) (optional)" Target="JARVIS_GOOGLE_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Mistral API-Key (optional)" Target="JARVIS_MISTRAL_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Groq API-Key (optional)" Target="JARVIS_GROQ_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="OpenRouter API-Key (optional)" Target="JARVIS_OPENROUTER_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="DeepSeek API-Key (optional)" Target="JARVIS_DEEPSEEK_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Deepgram API-Key (Sprache) (optional)" Target="JARVIS_DEEPGRAM_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="ElevenLabs API-Key (Sprache) (optional)" Target="JARVIS_ELEVENLABS_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Cartesia API-Key (Sprache) (optional)" Target="JARVIS_CARTESIA_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Azure Speech Key (optional)" Target="JARVIS_AZURE_SPEECH_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Brave Search API-Key (optional)" Target="JARVIS_BRAVE_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Tavily API-Key (optional)" Target="JARVIS_TAVILY_API_KEY" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Home Assistant Token (optional)" Target="JARVIS_HOMEASSISTANT_TOKEN" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Telegram Bot-Token (optional)" Target="JARVIS_TELEGRAM_BOT_TOKEN" Default="" Mode="" Description="Alternativ in /config/secrets.yaml eintragen." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
 </Container>

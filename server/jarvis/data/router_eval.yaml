@@ -1,0 +1,109 @@
+# Testsätze für den Router (bewusst NICHT identisch mit den Beispielen in intents.yaml).
+# python -m jarvis.router.eval   → Trefferquote, Verwechslungen, Schnellweg-Quote
+cases:
+  time_now:
+    - Wie spät ist es eigentlich?
+    - Sag mal die Uhrzeit
+    - Welchen Tag haben wir heute?
+    - Was für ein Datum ist heute?
+    - Weißt du wie spät es ist?
+    - Uhrzeit bitte
+  timer_set:
+    - Timer auf acht Minuten
+    - Stell bitte einen Timer für 15 Minuten
+    - Eieruhr fünf Minuten
+    - Ich brauche einen Timer über zwei Stunden
+    - Timer für die Nudeln, zehn Minuten
+    - Stelle einen Timer auf vier Minuten
+  timer_list:
+    - Wie lange noch auf dem Timer?
+    - Laufen gerade Timer?
+    - Welche Timer hab ich?
+    - Wann klingelt der Wecker?
+  timer_cancel:
+    - Timer löschen
+    - Bitte den Timer abbrechen
+    - Lösch den Nudel-Timer
+  alarm_set:
+    - Weck mich morgen um halb sieben
+    - Stell den Wecker auf Montag sieben Uhr
+    - Ich will morgen früh um sechs geweckt werden
+    - Wecker um 5:45
+  alarm_cancel:
+    - Wecker löschen
+    - Schalte den Wecker aus
+    - Den Wecker für morgen brauche ich nicht
+  reminder_set:
+    - Erinnere mich um 18 Uhr an das Paket
+    - Erinnerung morgen früh Tabletten nehmen
+    - Erinnere mich in einer Stunde an den Kuchen
+    - Kannst du mich am Montag an die Steuer erinnern?
+  weather:
+    - Wie wird das Wetter übermorgen?
+    - Regnet es morgen?
+    - Wie warm wird es heute?
+    - Wie ist das Wetter in München?
+    - Soll ich eine Jacke mitnehmen?
+    - Wird es heute noch schneien?
+  news:
+    - Was gibt es für Nachrichten?
+    - Lies mir die Nachrichten vor
+    - Was ist los in der Welt?
+    - Die Schlagzeilen bitte
+  web_search:
+    - Such mal im Internet nach dem besten Akkuschrauber
+    - Recherchiere die Öffnungszeiten der Bücherei
+    - Kannst du online nachschauen, wann der Film läuft?
+  docker_status:
+    - Läuft Nextcloud?
+    - Ist der Jellyfin Server online?
+    - Wie ist der Status von Jellyfin?
+    - Welche Container sind an?
+  docker_action:
+    - Starte Jellyfin neu
+    - Stopp den Nextcloud Container
+    - Fahr den Jellyfin Container hoch
+  run_script:
+    - Führe das Backup aus
+    - Starte bitte das Backup-Skript
+  memory_remember:
+    - Merk dir, dass mein Auto in der Tiefgarage steht
+    - Merk dir, dass ich am Donnerstag frei habe
+  memory_recall:
+    - Was weißt du alles über mich?
+    - Was hast du dir über mich gemerkt?
+  calendar:
+    - Was habe ich heute für Termine?
+    - Steht morgen etwas im Kalender?
+    - Was steht am Montag an?
+  smart_home:
+    - Schalte das Licht in der Küche an
+    - Mach das Wohnzimmerlicht aus
+    - Stell die Heizung im Bad auf 22 Grad
+  private_mode:
+    - Privatmodus einschalten
+    - Mach den Privatmodus aus
+  volume:
+    - Bitte lauter
+    - Kannst du leiser sprechen?
+    - Lautstärke auf 30
+  stop:
+    - Stopp bitte
+    - Hör jetzt auf
+    - Sei ruhig
+  reset:
+    - Vergiss das Gespräch
+    - Neues Thema bitte
+  repeat:
+    - Was hast du eben gesagt?
+    - Wiederhol das nochmal
+  help:
+    - Was kannst du alles?
+    - Was kann ich dich fragen?
+  chat:
+    - Erzähl mir was über Pinguine
+    - Wie geht es dir heute?
+    - Was ist die Hauptstadt von Australien?
+    - Warum ist Bananenbrot so lecker?
+    - Schreib mir einen kurzen Reim über Katzen
+    - Wer hat die Glühbirne erfunden?

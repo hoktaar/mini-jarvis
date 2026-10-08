@@ -1,9 +1,17 @@
-# Zum Testen außerhalb von Unraid (Docker + NVIDIA Container Toolkit)
+# Zum Betrieb außerhalb von Unraid (Docker + NVIDIA Container Toolkit)
+#   docker compose up -d   →  https://<server>:8443/  (CA-Zertifikat unter /ca.crt)
+# Ohne GPU: den deploy-Block entfernen und in config.yaml Cloud-Anbieter oder ein externes Ollama nutzen.
 services:
   mini-jarvis:
     build: { context: ., dockerfile: docker/Dockerfile }
     image: mini-jarvis:dev
-    ports: ["8080:8080"]
+    ports:
+      - "8080:8080"     # CYD/ESP32 und Apps (HTTP)
+      - "8443:8443"     # Browser mit Mikrofon und USB-Flasher (HTTPS)
+    environment:
+      TZ: Europe/Berlin
+      JARVIS_HOSTS: ""  # z. B. 192.168.1.144,server.local – für das Zertifikat
+      # JARVIS_ANTHROPIC_API_KEY: ""    # Cloud-Schlüssel optional hier statt in secrets.yaml
     volumes:
       - ./data/config:/config
       - ./data/data:/data
