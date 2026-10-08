@@ -33,7 +33,7 @@ async def run_script(registry, sid: str, args: dict) -> dict:
     )
     try:
         out, _ = await asyncio.wait_for(proc.communicate(), timeout=spec.timeout)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         return {"ok": False, "error": f"Zeitüberschreitung nach {spec.timeout} s"}
     text = out.decode(errors="replace")[-2000:]

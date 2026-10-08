@@ -26,8 +26,7 @@ from pipecat.classifiers.base_classifier import (
     YesNoResult,
 )
 
-YES_WORDS = {"ja", "jawohl", "genau", "klar", "mach", "bitte", "okay", "ok", "gerne", "sicher", "richtig", "los", "bestätigt"}
-NO_WORDS = {"nein", "nee", "nö", "stopp", "abbrechen", "lass", "nicht", "falsch", "halt", "warte"}
+from jarvis.router.confirm import strict_yes_no
 
 
 def _text(state: str | dict[str, Any] | list[Any]) -> str:
@@ -35,6 +34,9 @@ def _text(state: str | dict[str, Any] | list[Any]) -> str:
 
 
 class _TrigramEmbedder:
+    # Ähnlichkeit unter `floor` gilt als fremd, ab `ref` als sicherer Treffer.
+    floor, ref = 0.0, 0.6
+
     def encode(self, texts: list[str]) -> list[Counter]:
         out = []
         for t in texts:
@@ -56,6 +58,8 @@ class _SentenceEmbedder:
 
         self._model = SentenceTransformer(model_name, device="cpu")
         self._prefix = "query: " if "e5" in model_name else ""
+        # e5-Modelle liefern auch für fremde Sätze hohe Kosinuswerte (~0,75) – Skala anpassen.
+        self.floor, self.ref = (0.78, 0.9) if "e5" in model_name else (0.3, 0.75)
 
     def encode(self, texts: list[str]):
         return self._model.encode([self._prefix + t for t in texts], normalize_embeddings=True)
@@ -73,6 +77,8 @@ class LocalExampleClassifier(BaseClassifier):
         examples: Mapping[str, list[str]],
         embedding_model: str | None = None,
         temperature: float | None = None,
+        floor: float | None = None,
+        ref: float | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -81,12 +87,17 @@ class LocalExampleClassifier(BaseClassifier):
             try:
                 self._embedder = _SentenceEmbedder(embedding_model)
                 self._temperature = temperature or 0.05
-            except Exception:  # noqa: BLE001 – Modell fehlt → Fallback
+            except Exception as e:  # noqa: BLE001 – Modell fehlt → Fallback
+                from loguru import logger
+
+                logger.warning(f"Embedding-Modell {embedding_model} nicht verfügbar ({e}) – Trigramm-Ersatz")
                 self._embedder = _TrigramEmbedder()
                 self._temperature = temperature or 0.08
         else:
             self._embedder = _TrigramEmbedder()
             self._temperature = temperature or 0.08
+        self._floor = floor if floor is not None else self._embedder.floor
+        self._ref = ref if ref is not None else self._embedder.ref
         self._examples: dict[str, list] = {}
         self.set_examples(examples)
 
@@ -121,19 +132,13 @@ class LocalExampleClassifier(BaseClassifier):
         best = max(probs, key=probs.get)
         # Konfidenz: Wahrscheinlichkeit gedämpft durch die absolute Ähnlichkeit,
         # damit völlig fremde Sätze nicht mit hoher Sicherheit zugeordnet werden.
-        confidence = probs[best] * min(1.0, scores[best] / 0.6)
+        span = max(1e-6, self._ref - self._floor)
+        confidence = probs[best] * max(0.0, min(1.0, (scores[best] - self._floor) / span))
         return ChoiceResult(choice=best, probabilities=probs, confidence=confidence)
 
     @staticmethod
     def _yes_no(text: str) -> YesNoResult:
-        words = set(re.findall(r"[a-zäöüß]+", text.lower()))
-        yes, no = len(words & YES_WORDS), len(words & NO_WORDS)
-        if "nicht" in words and yes:        # "bitte nicht" → nein
-            yes -= 1
-            no += 1
-        if yes == no:
-            return YesNoResult(probability=0.5)
-        return YesNoResult(probability=0.97 if yes > no else 0.03)
+        return YesNoResult(probability=strict_yes_no(text))
 
     async def _ask(self, state, questions: Mapping[str, ClassifierQuestion]):
         text = _text(state)
@@ -148,10 +153,11 @@ class LocalExampleClassifier(BaseClassifier):
         return results, None
 
 
-def build_classifier(kind: str, examples: Mapping[str, list[str]], secrets: dict, embedding_model: str | None):
-    """Fabrik: local | jev | llm."""
+def build_classifier(kind: str, examples: Mapping[str, list[str]], secrets: dict, embedding_model: str | None,
+                     floor: float | None = None, ref: float | None = None):
+    """Fabrik: local | jev."""
     if kind == "jev":
         from pipecat.classifiers.jev.classifier import JevClassifier
 
         return JevClassifier(api_key=secrets.get("typesafe_api_key"))
-    return LocalExampleClassifier(examples, embedding_model=embedding_model)
+    return LocalExampleClassifier(examples, embedding_model=embedding_model, floor=floor, ref=ref)

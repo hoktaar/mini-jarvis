@@ -17,8 +17,9 @@ WHITELIST_FILE = Path(os.environ.get("JARVIS_CONFIG_DIR", "/config")) / "whiteli
 ACTIONS = {"start", "stop", "restart"}
 
 
-def load_whitelist(path: Path = WHITELIST_FILE) -> dict[str, set[str]]:
-    data = yaml.safe_load(path.read_text()) if path.exists() else {}
+def load_whitelist(path: Path | None = None) -> dict[str, set[str]]:
+    path = path or WHITELIST_FILE
+    data = (yaml.safe_load(path.read_text()) or {}) if path.exists() else {}
     return {name: set(actions) for name, actions in (data.get("containers") or {}).items()}
 
 

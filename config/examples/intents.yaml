@@ -1,5 +1,13 @@
 # Absichten für den System-1-Router.
-# risk: read | write | critical   fast: darf der Schnellweg das Tool direkt ausführen?
+#   tool:     Werkzeug für den Schnellweg (null = Gespräch → LLM)
+#   risk:     read | write | critical (nur Doku – maßgeblich ist das Werkzeug)
+#   fast:     darf der Schnellweg das Werkzeug direkt ausführen?
+#   slots:    Pflichtangaben – fehlen sie, fragt Jarvis nach (asks/ask)
+#   optional: Angaben, die mitgenommen werden, wenn sie im Satz stehen
+#   args:     feste Argumente für das Werkzeug
+#   tools:    weitere Werkzeuge für den fokussierten LLM-Weg (z. B. Home Assistant)
+#   prefer:   Zeitdeutung bei „um 7“: next (nächstes 7 Uhr) | soonest (7 oder 19 Uhr)
+# Korrekturen aus der Verwaltung kommen zusätzlich aus der Datenbank dazu.
 intents:
   time_now:
     tool: get_time
@@ -11,18 +19,27 @@ intents:
       - Welcher Tag ist heute?
       - Welches Datum haben wir?
       - Sag mir die Uhrzeit
+      - Was ist heute für ein Wochentag?
+      - Wie spät haben wir es gerade?
+      - Den wievielten haben wir heute?
+      - Uhrzeit
   timer_set:
     tool: set_timer
     risk: write
     fast: true
     slots: [duration]
+    optional: [label]
     ask: "Wie lange soll der Timer laufen?"
     examples:
       - Stell einen Timer auf fünf Minuten
       - Timer zehn Minuten
-      - Erinnere mich in zwanzig Minuten
       - Starte einen Timer für eine halbe Stunde
       - Timer auf 3 Minuten für die Eier
+      - Stell einen Pizza-Timer auf zwölf Minuten
+      - Wecker in zwanzig Minuten
+      - Stell mir eine Eieruhr auf sieben Minuten
+      - Neuer Timer anderthalb Stunden
+      - Mach einen Timer über 90 Sekunden
   timer_list:
     tool: list_timers
     risk: read
@@ -31,84 +48,206 @@ intents:
       - Welche Timer laufen?
       - Wie lange läuft der Timer noch?
       - Zeig mir meine Timer
+      - Wie viel Zeit ist noch auf dem Timer?
+      - Welche Wecker sind gestellt?
+      - Habe ich Erinnerungen?
+      - Wann klingelt mein Wecker?
   timer_cancel:
     tool: cancel_timer
     risk: write
     fast: true
+    optional: [label]
+    args: {kind: timer}
     examples:
       - Lösch den Timer
       - Timer abbrechen
       - Stopp den Timer
+      - Lösche den Pizza-Timer
+      - Brich den Timer ab
+      - Timer aus
   alarm_set:
     tool: set_alarm
     risk: write
     fast: true
     slots: [datetime]
+    prefer: next
     ask: "Wann soll ich dich wecken?"
     examples:
       - Weck mich morgen um sieben
       - Stell einen Wecker auf 6 Uhr 30
       - Wecker für Montag um acht
+      - Weck mich um halb sieben
+      - Stell den Wecker auf sieben Uhr
+      - Ich muss morgen um sechs aufstehen
+  alarm_cancel:
+    tool: cancel_timer
+    risk: write
+    fast: true
+    args: {kind: alarm}
+    examples:
+      - Lösch den Wecker
+      - Wecker ausschalten
+      - Wecker für morgen löschen
+      - Ich brauche keinen Wecker
+      - Mach den Wecker aus
   reminder_set:
     tool: set_reminder
     risk: write
-    fast: false            # braucht meist einen Text → LLM
+    fast: true
     slots: [datetime, text]
+    prefer: soonest
+    asks:
+      datetime: "Wann soll ich dich erinnern?"
+      text: "Woran soll ich dich erinnern?"
     examples:
       - Erinnere mich morgen um zehn an den Zahnarzt
       - Erinnerung heute Abend Müll rausbringen
+      - Erinnere mich in zwanzig Minuten an die Wäsche
+      - Erinnere mich daran, die Blumen zu gießen
+      - Erinnere mich am Freitag an den Geburtstag von Oma
+      - Stell eine Erinnerung für morgen früh
   weather:
     tool: get_weather
     risk: read
     fast: true
+    optional: [day_offset, place]
     examples:
       - Wie wird das Wetter morgen?
       - Regnet es heute?
       - Wie warm ist es draußen?
       - Brauche ich einen Schirm?
+      - Wie ist das Wetter in Hamburg?
+      - Wie wird das Wetter am Wochenende?
+      - Wie kalt wird es heute Nacht?
+      - Scheint morgen die Sonne?
+      - Wettervorhersage
   news:
     tool: get_news
     risk: read
-    fast: false
+    fast: true
     examples:
       - Was gibt es Neues?
       - Die aktuellen Nachrichten bitte
       - Was ist heute in der Welt passiert?
+      - Lies mir die Schlagzeilen vor
+      - Gibt es Neuigkeiten?
+      - Nachrichten
   web_search:
-    tool: web_search
+    tool: search_web
     risk: read
     fast: false
+    tools: [search_news]
     examples:
       - Such im Internet nach
       - Recherchiere mal
       - Finde heraus wer
+      - Suche nach den Öffnungszeiten vom Baumarkt
+      - Schau mal online nach
+      - Google mal
   docker_status:
     tool: container_status
     risk: read
     fast: true
-    slots: [name]
-    ask: "Welchen Container meinst du?"
+    optional: [name]
     examples:
       - Läuft Jellyfin?
       - Wie ist der Status der Container?
       - Ist der Plex Container online?
+      - Welche Container laufen?
+      - Ist Nextcloud erreichbar?
+      - Läuft der Container noch?
   docker_action:
     tool: container_action
     risk: critical
     fast: true             # sicher: die Policy verlangt trotzdem eine Bestätigung
     slots: [name, action]
-    ask: "Welchen Container meinst du, und was soll ich tun?"
+    asks:
+      name: "Welchen Container meinst du?"
+      action: "Soll ich ihn starten, stoppen oder neu starten?"
     examples:
       - Starte den Jellyfin Container neu
       - Stopp Container Plex
       - Starte Nextcloud
+      - Fahr ComfyUI herunter
+      - Mach einen Neustart von Jellyfin
   run_script:
     tool: run_script
     risk: critical
-    fast: false
+    fast: true
+    slots: [script_id]
+    ask: "Welches Skript soll ich ausführen?"
     examples:
       - Führe das Backup Skript aus
       - Starte das Skript
+      - Starte das Backup
+      - Führe say hello aus
+  memory_remember:
+    tool: remember
+    risk: write
+    fast: true
+    slots: [memory]
+    ask: "Was soll ich mir merken?"
+    examples:
+      - Merk dir, dass ich Kaffee schwarz trinke
+      - Merk dir bitte meine Schuhgröße ist 44
+      - Speicher dir, dass der Schlüssel im Flur liegt
+      - Notier dir, dass Anna am 3. Mai Geburtstag hat
+  memory_recall:
+    tool: recall
+    risk: read
+    fast: true
+    examples:
+      - Was weißt du über mich?
+      - Was hast du dir gemerkt?
+      - Woran erinnerst du dich?
+      - Was habe ich dir erzählt?
+  calendar:
+    tool: calendar_agenda
+    risk: read
+    fast: true
+    optional: [day_offset]
+    examples:
+      - Was steht heute an?
+      - Habe ich morgen Termine?
+      - Was ist in meinem Kalender?
+      - Welche Termine habe ich am Freitag?
+      - Wie sieht mein Tag aus?
+  smart_home:
+    tool: null
+    risk: write
+    fast: false
+    tools: [HassTurnOn, HassTurnOff, HassLightSet, HassClimateSetTemperature, GetLiveContext]
+    examples:
+      - Mach das Licht im Wohnzimmer an
+      - Schalte die Küchenlampe aus
+      - Dimme das Licht auf 30 Prozent
+      - Stell die Heizung auf 21 Grad
+      - Ist die Haustür abgeschlossen?
+      - Wie warm ist es im Schlafzimmer?
+  private_mode:
+    tool: set_private_mode
+    risk: write
+    fast: true
+    slots: [enabled]
+    ask: "Soll ich den Privatmodus ein- oder ausschalten?"
+    examples:
+      - Privatmodus an
+      - Schalte den Privatmodus ein
+      - Privatmodus aus
+      - Beende den Privatmodus
+      - Nur noch lokal antworten
+  volume:
+    tool: set_volume
+    risk: read
+    fast: true
+    slots: [volume]
+    ask: "Lauter oder leiser?"
+    examples:
+      - Lauter
+      - Leiser bitte
+      - Lautstärke auf 50 Prozent
+      - Sprich lauter
+      - Etwas leiser
   stop:
     tool: stop
     risk: read
@@ -117,7 +256,36 @@ intents:
       - Stopp
       - Hör auf
       - Ruhe
+      - Sei still
       - Abbrechen
+      - Danke, das reicht
+  reset:
+    tool: reset_conversation
+    risk: read
+    fast: true
+    examples:
+      - Neues Thema
+      - Vergiss unser Gespräch
+      - Lass uns von vorne anfangen
+      - Fang neu an
+  repeat:
+    tool: repeat_last
+    risk: read
+    fast: true
+    examples:
+      - Was hast du gesagt?
+      - Wiederhole das bitte
+      - Kannst du das nochmal sagen?
+      - Sag das nochmal
+  help:
+    tool: help
+    risk: read
+    fast: true
+    examples:
+      - Was kannst du?
+      - Hilfe
+      - Wie funktionierst du?
+      - Welche Befehle gibt es?
   chat:
     tool: null
     risk: read
@@ -128,3 +296,8 @@ intents:
       - Erklär mir
       - Wie geht es dir?
       - Wer war Albert Einstein?
+      - Warum ist der Himmel blau?
+      - Schreib mir ein Gedicht
+      - Was ist der Unterschied zwischen
+      - Hilf mir bei einer Entscheidung
+      - Wie koche ich Spaghetti Carbonara?

@@ -17,6 +17,7 @@ class ToolContext:
     device_kind: str = "test"
     in_car: bool = False
     provider: str = "local"
+    session: Any = None              # JarvisSession – für Sitzungsbefehle (Privatmodus, Lautstärke …)
 
 
 @dataclass
@@ -39,6 +40,8 @@ class Tool:
     handler: Handler
     risk: Risk = "read"
     taint: bool = False
+    source: str = "core"             # core | mcp:<server>
+    cloud: bool = False              # schickt Daten an einen externen Dienst (im Privatmodus gesperrt)
 
 
 class ToolRegistry:
@@ -47,6 +50,9 @@ class ToolRegistry:
 
     def add(self, tool: Tool) -> None:
         self._tools[tool.name] = tool
+
+    def remove_source(self, source: str) -> None:
+        self._tools = {n: t for n, t in self._tools.items() if t.source != source}
 
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
@@ -62,7 +68,7 @@ class ToolRegistry:
         from pipecat.adapters.schemas.function_schema import FunctionSchema
         from pipecat.adapters.schemas.tools_schema import ToolsSchema
 
-        selected = [self._tools[n] for n in (names or self.names()) if n in self._tools]
+        selected = [self._tools[n] for n in (self.names() if names is None else names) if n in self._tools]
         return ToolsSchema(
             standard_tools=[
                 FunctionSchema(

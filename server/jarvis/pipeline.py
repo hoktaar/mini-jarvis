@@ -1,71 +1,81 @@
-"""Pipecat-Pipeline pro Geräteverbindung."""
+"""Pipecat-Sprachpipeline pro Geräteverbindung."""
 
 from __future__ import annotations
 
-import inspect
-import os
+import asyncio
+import time
 
 from fastapi import WebSocket
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
+from pipecat.workers.runner import WorkerRunner
 
 from jarvis.devices import Device
-from jarvis.processors import ClientEventsProcessor, System1Processor, WakeWordGate
+from jarvis.processors import (
+    ClientEventsProcessor,
+    ClientInputProcessor,
+    EventOutput,
+    MetricsCollector,
+    SilentTurnFilter,
+    System1Processor,
+    WakeWordGate,
+)
 from jarvis.providers import make_cloud_llm, make_local_llm, make_stt, make_tts
-from jarvis.session import JarvisSession, Services
+from jarvis.session import Connection, JarvisSession, Services
 from jarvis.transports.cyd_serializer import CydFrameSerializer
 from jarvis.transports.rtvi_serializer import RtviProtobufSerializer
 
-SATELLITES = {"cyd", "esp32"}
-# MCP-Server, die Jarvis selbst in-process abbildet (Policy!), nicht per MCPClient.
-IN_PROCESS_MCP = {"docker"}
+
+def hotwords(services: Services) -> list[str]:
+    names = list(services.router.known_names) if services.router else []
+    return names + [sid.replace("_", " ") for sid in services.scripts]
 
 
-async def _start_mcp(session: JarvisSession, llms: list) -> None:
-    """Externe MCP-Server (z. B. SearXNG) starten und ihre Tools registrieren."""
-    from mcp import StdioServerParameters
-    from pipecat.services.mcp_service import MCPClient
+def build_llms(session: JarvisSession, services: Services):
+    local = make_local_llm(services.cfg)
+    cloud = make_cloud_llm(services.cfg, services.secrets)
+    llms = [local] + ([cloud] if cloud else [])
+    for llm, provider in zip(llms, ["local", "cloud"], strict=False):
+        session.register_functions(llm, provider)
+    switcher = LLMSwitcher(llms) if len(llms) > 1 else None
+    return local, cloud, switcher
 
-    for m in session.cfg.mcp_servers:
-        if not m.enabled or m.name in IN_PROCESS_MCP or m.transport != "stdio":
-            continue
-        env = {"PATH": os.environ.get("PATH", ""), **m.env}
-        client = MCPClient(StdioServerParameters(command=m.command, args=m.args, env=env))
-        try:
-            await client.start()
-            schema = await client.register_tools(llms[0])
-            for other in llms[1:]:
-                res = client.register_tools_schema(schema, other)
-                if inspect.isawaitable(res):
-                    await res
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"MCP-Server {m.name} nicht verfügbar: {e}")
-            continue
-        session.mcp_clients.append(client)
-        session.extra_tools += [(fn, m.risk) for fn in schema.standard_tools]
-        if m.taint:
-            session.tainted_tools |= {fn.name for fn in schema.standard_tools}
+
+async def send_initial_state(session: JarvisSession) -> None:
+    """Nach dem Verbinden: Privatmodus, Lautstärke, Timer und klingelnde Alarme melden."""
+    services = session.services
+    from jarvis import __version__
+
+    await session.emit({"type": "hello", "device": session.device.name, "kind": session.device.kind,
+                        "room": session.device.room, "version": __version__})
+    await session.emit({"type": "private", "value": session.private})
+    if session.device.satellite:
+        await session.emit({"type": "volume", "value": int(session.device.settings.get("volume", 70))})
+    await session.emit({"type": "timers", "items": services.timers.items(), "now": time.time()})
+    for row in services.timers.ringing():
+        if row["device_id"] in (None, session.device.id):
+            label = row["label"] or {"timer": "Timer", "alarm": "Wecker", "reminder": "Erinnerung"}.get(row["kind"])
+            await session.emit({"type": "alarm", "id": row["id"], "kind": row["kind"], "label": label})
+    await session.emit({"type": "state", "value": "idle"})
 
 
 async def run_device_session(websocket: WebSocket, device: Device, services: Services) -> None:
     cfg = services.cfg
     rate = cfg.audio.sample_rate
-    session = JarvisSession(services, device)
-    services.sessions[device.id] = session
+    session = services.session_for(device)
+    satellite = device.satellite
 
-    serializer = CydFrameSerializer(rate) if device.kind in SATELLITES else RtviProtobufSerializer()
+    serializer = CydFrameSerializer(rate) if satellite else RtviProtobufSerializer()
     transport = FastAPIWebsocketTransport(
         websocket,
         FastAPIWebsocketParams(
@@ -75,60 +85,71 @@ async def run_device_session(websocket: WebSocket, device: Device, services: Ser
         ),
     )
 
-    stt = make_stt(cfg, services.secrets, services.router.known_names if services.router else [])
-    tts = make_tts(cfg, services.secrets)
-    session.local_llm = make_local_llm(cfg)
-    session.cloud_llm = make_cloud_llm(cfg, services.secrets)
-    llms = [session.local_llm] + ([session.cloud_llm] if session.cloud_llm else [])
-    for llm, provider in zip(llms, ["local", "cloud"]):
-        session.register_functions(llm, provider)
-    await _start_mcp(session, llms)
-    llm_stage = LLMSwitcher(llms) if len(llms) > 1 else session.local_llm
-    session.switcher = llm_stage if len(llms) > 1 else None
-
-    context = LLMContext(
-        messages=[{"role": "system", "content": cfg.persona}],
-        tools=session.default_tools(),
-    )
-    session.context = context
+    gpu_busy = bool(services.gpu and services.gpu.busy)
+    stt = await asyncio.to_thread(make_stt, cfg, services.secrets, hotwords(services), gpu_busy)
+    tts = await asyncio.to_thread(make_tts, cfg, services.secrets)
+    local_llm, cloud_llm, switcher = build_llms(session, services)
+    context = session.ensure_context()
+    session.refresh_system_prompt()
     aggregators = LLMContextAggregatorPair(
         context,
         # VAD sitzt als eigener Prozessor VOR Whisper (segmentierte STT braucht die VAD-Frames);
-        # leere Turns lösen kein LLM aus (wichtig nach Schnellweg-Antworten).
+        # leere Turns lösen kein LLM aus – der System1Processor schreibt die Nutzerfrage selbst.
         user_params=LLMUserAggregatorParams(empty_user_turn=None),
     )
 
-    stages = [transport.input()]
-    if device.kind in SATELLITES and cfg.audio.wake_word.enabled:
-        ww = cfg.audio.wake_word
-        stages.append(WakeWordGate(session, ww.model, ww.threshold, ww.listen_seconds))
+    conn = Connection(task=None, websocket=websocket, uses_rtvi=not satellite, local_llm=local_llm,
+                      cloud_llm=cloud_llm, switcher=switcher, stt=stt, tts=tts)
+    conn.system1 = System1Processor(session, voice=True, conn=conn)
+    stages = [transport.input(), ClientInputProcessor(session)]
+    if satellite:
+        conn.gate = WakeWordGate(session, cfg.audio.wake_word, rate)
+        stages.append(conn.gate)
+    stages.append(VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.6))))
+    if stt is not None:
+        stages.append(stt)
+    stages += [conn.system1, aggregators.user(), switcher or local_llm]
+    if tts is not None:
+        stages.append(tts)
     stages += [
-        VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.6))),
-        stt,
-        System1Processor(session),
-        aggregators.user(),
-        llm_stage,
-        tts,
-        ClientEventsProcessor(session),
+        ClientEventsProcessor(session, voice=True, tts=tts is not None),
+        SilentTurnFilter(session),
+        MetricsCollector(session, conn=conn),
+        EventOutput(session, rtvi=not satellite),
         transport.output(),
         aggregators.assistant(),
     ]
 
-    task = PipelineTask(
+    task = PipelineWorker(
         Pipeline(stages),
         params=PipelineParams(audio_in_sample_rate=rate, audio_out_sample_rate=rate,
-                              allow_interruptions=device.kind not in SATELLITES),
-        enable_rtvi=device.kind not in SATELLITES,
+                              enable_metrics=True, enable_usage_metrics=True),
+        enable_rtvi=not satellite,
+        # Geräte warten oft lange auf „Hey Jarvis“ – Pipecats 5-Minuten-Leerlaufabbruch aus.
+        idle_timeout_secs=None,
     )
-    session.task = task
+    conn.task = task
+
+    @transport.event_handler("on_client_disconnected")
+    async def _disconnected(_transport, _ws):
+        await task.cancel()
+
+    if not satellite:
+        @task.rtvi.event_handler("on_client_ready")
+        async def _ready(rtvi):
+            # bot-ready schickt der PipelineTask selbst (eigener Handler) – hier nur den Zustand
+            await send_initial_state(session)
+    else:
+        @task.event_handler("on_pipeline_started")
+        async def _started(_task, _frame):
+            await send_initial_state(session)
+
+    await session.attach_voice(conn)
     logger.info(f"Sitzung gestartet: {device.name} ({device.kind})")
     try:
-        await PipelineRunner(handle_sigint=False).run(task)
+        runner = WorkerRunner(handle_sigint=False)
+        await runner.add_workers(task)
+        await runner.run()
     finally:
-        for client in session.mcp_clients:
-            try:
-                await client.close()
-            except Exception:  # noqa: BLE001
-                pass
-        services.sessions.pop(device.id, None)
+        session.detach_voice(conn)
         logger.info(f"Sitzung beendet: {device.name}")
