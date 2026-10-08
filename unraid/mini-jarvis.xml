@@ -8,19 +8,38 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/hoktaar/mini-jarvis/issues</Support>
   <Project>https://github.com/hoktaar/mini-jarvis</Project>
-  <Overview>Mini-Jarvis: lokaler, deutschsprachiger Sprachassistent (Pipecat, Whisper, Ollama, Piper) für ESP32-Satelliten, PWA, Android und mehr.</Overview>
+  <Overview>Mini-Jarvis: deutschsprachiger Sprachassistent (Pipecat, Whisper, Ollama, Piper) – lokal oder mit Cloud-Diensten (Claude, GPT, Gemini, Deepgram, ElevenLabs …). Für CYD/ESP32-Displays, Browser/Handy (PWA), Telegram und Matrix. Web-Dashboard, Verwaltung, CYD-Firmware per USB flashen und per WLAN aktualisieren. HTTPS (Port 8443) mit eigener CA – nötig für Mikrofon und USB-Flasher im Browser.</Overview>
   <Category>Tools: HomeAutomation: AI:</Category>
-  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
-  <Icon>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/server/jarvis/web/icon.svg</Icon>
+  <WebUI>https://[IP]:[PORT:8443]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/server/jarvis/web/icons/icon-192.png</Icon>
   <ExtraParams>--runtime=nvidia</ExtraParams>
-  <Config Name="Web-UI und Geräte" Target="8080" Default="8080" Mode="tcp" Type="Port" Display="always" Required="true">8080</Config>
+  <Config Name="Web-UI und Geräte (HTTP)" Target="8080" Default="8080" Mode="tcp" Type="Port" Display="always" Required="true" Description="CYD/ESP32 und Apps im Heimnetz">8080</Config>
+  <Config Name="Web-UI (HTTPS)" Target="8443" Default="8443" Mode="tcp" Type="Port" Display="always" Required="true" Description="Für Mikrofon im Browser und den USB-Flasher. CA-Zertifikat unter /ca.crt laden.">8443</Config>
+  <Config Name="Server-Adressen für das Zertifikat" Target="JARVIS_HOSTS" Default="" Mode="" Type="Variable" Display="always" Required="false" Description="IP und Namen, unter denen Jarvis erreichbar ist, z. B. 192.168.1.144,tower.local"></Config>
+  <Config Name="Zeitzone" Target="TZ" Default="Europe/Berlin" Mode="" Type="Variable" Display="always" Required="false">Europe/Berlin</Config>
   <Config Name="Konfiguration" Target="/config" Default="/mnt/user/appdata/mini-jarvis/config" Mode="rw" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/config</Config>
   <Config Name="Daten" Target="/data" Default="/mnt/user/appdata/mini-jarvis/data" Mode="rw" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/data</Config>
   <Config Name="Modelle (Cache-Pool empfohlen)" Target="/models" Default="/mnt/cache/appdata/mini-jarvis/models" Mode="rw" Type="Path" Display="always" Required="true">/mnt/cache/appdata/mini-jarvis/models</Config>
   <Config Name="Skripte (read-only)" Target="/scripts" Default="/mnt/user/appdata/mini-jarvis/scripts" Mode="ro" Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/scripts</Config>
   <Config Name="Docker-Socket (nur für den Filter-Proxy)" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="rw" Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
-  <Config Name="NVIDIA_VISIBLE_DEVICES" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Type="Variable" Display="advanced" Required="true">all</Config>
-  <Config Name="NVIDIA_DRIVER_CAPABILITIES" Target="NVIDIA_DRIVER_CAPABILITIES" Default="all" Mode="" Type="Variable" Display="advanced" Required="true">all</Config>
+  <Config Name="Eingebettetes Ollama" Target="JARVIS_EMBEDDED_OLLAMA" Default="auto" Mode="" Type="Variable" Display="advanced" Required="false" Description="auto = starten, wenn config.yaml ein lokales Ollama nutzt; false = externes Ollama oder nur Cloud">auto</Config>
+  <Config Name="Eingebettetes SearXNG" Target="JARVIS_EMBEDDED_SEARXNG" Default="auto" Mode="" Type="Variable" Display="advanced" Required="false">auto</Config>
+  <Config Name="Öffentliche Adresse (optional)" Target="JARVIS_PUBLIC_URL" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Description="Für QR-Codes hinter einem Reverse-Proxy, z. B. https://jarvis.example.de"></Config>
+  <Config Name="NVIDIA_VISIBLE_DEVICES" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Type="Variable" Display="advanced" Required="false">all</Config>
+  <Config Name="NVIDIA_DRIVER_CAPABILITIES" Target="NVIDIA_DRIVER_CAPABILITIES" Default="all" Mode="" Type="Variable" Display="advanced" Required="false">all</Config>
   <Config Name="Anthropic API-Key (optional)" Target="JARVIS_ANTHROPIC_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="OpenAI API-Key (optional)" Target="JARVIS_OPENAI_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Google API-Key (Gemini) (optional)" Target="JARVIS_GOOGLE_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Mistral API-Key (optional)" Target="JARVIS_MISTRAL_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Groq API-Key (optional)" Target="JARVIS_GROQ_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="OpenRouter API-Key (optional)" Target="JARVIS_OPENROUTER_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="DeepSeek API-Key (optional)" Target="JARVIS_DEEPSEEK_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Deepgram API-Key (Sprache) (optional)" Target="JARVIS_DEEPGRAM_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="ElevenLabs API-Key (Sprache) (optional)" Target="JARVIS_ELEVENLABS_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Cartesia API-Key (Sprache) (optional)" Target="JARVIS_CARTESIA_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Azure Speech Key (optional)" Target="JARVIS_AZURE_SPEECH_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Brave Search API-Key (optional)" Target="JARVIS_BRAVE_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Tavily API-Key (optional)" Target="JARVIS_TAVILY_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Home Assistant Token (optional)" Target="JARVIS_HOMEASSISTANT_TOKEN" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Telegram Bot-Token (optional)" Target="JARVIS_TELEGRAM_BOT_TOKEN" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
 </Container>

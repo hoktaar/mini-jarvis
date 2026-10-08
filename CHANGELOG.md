@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.3.0 – Vollwertiger Betrieb, Cloud-Anbieter, neue Oberflächen, CYD-Firmware
+
+**Betrieb und Sicherheit**
+- Container startet zuverlässig: Konfiguration und Admin-Token werden als root angelegt, Runner-Socket mit
+  passenden Rechten, Docker-Socket über Gruppenmitgliedschaft statt `chmod`, HAProxy-Regeln aus der Whitelist.
+- HTTPS mit eigener CA auf Port 8443 (`/ca.crt`), Zertifikat folgt `JARVIS_HOSTS`.
+- Geräte-Token per `Authorization`-Header oder Einmal-Ticket, Tokens im Log geschwärzt; Admin-Token mit
+  konstantzeitigem Vergleich und Bremse gegen Raten.
+- Strengere Ja/Nein-Bestätigung (Zeitlimit, „wie bitte?“, zwei unklare Antworten = Abbruch), Taint bleibt
+  mehrere Runden bestehen, MCP-Tools mit Allowlist und Risikostufen.
+
+**Sprache und Werkzeuge**
+- Eine Sitzung pro Gerät (Sprache und Text teilen Verlauf), Text-Pipeline für REST, Telegram und Matrix.
+- Router mit Dialogzustand, optionalen Angaben, deutscher Datums-/Zeiterkennung („halb sieben“, „übermorgen
+  früh“) – 92,7 % auf dem Testsatz; Auswertung per `python -m jarvis.router.eval` und in der Verwaltung.
+- Neue Werkzeuge: Wecker löschen, Gedächtnis, Kalender (CalDAV), Home Assistant, Lautstärke, Privatmodus,
+  Wiederholen, Neues Thema, Hilfe; Wetter mit Ort und bis 15 Tage.
+- Push über ntfy, Telegram- und Matrix-Bots mit Ja/Nein-Knöpfen und Sprachnachrichten.
+
+**Cloud-Anbieter (gleichwertig zu lokal)**
+- Sprachmodell: Anthropic, OpenAI, Google, Mistral, Groq, OpenRouter, DeepSeek, OpenAI-kompatibel;
+  `primary: local|cloud` mit Ausfall in beide Richtungen, lokales Modell optional.
+- Spracherkennung: Whisper, OpenAI, Groq, Deepgram, Azure, Google, ElevenLabs; Sprachausgabe: Piper, OpenAI,
+  ElevenLabs, Cartesia, Deepgram, Azure, Google; Websuche: SearXNG, Brave, Tavily.
+- Budget pro Tag/Monat, Privatmodus pro Gerät, Hinweise auf fehlende Schlüssel in der Verwaltung.
+
+**Oberflächen**
+- Neues HUD-Dashboard: Reaktor mit Zuständen, Wellenform, Chat, Globaler Status, Systemressourcen, Smarthome,
+  Bevorstehend, Live-Datenfeed, Netzwerkaktivität; passt sich Desktop, Tablet und Handy an, hell/dunkel.
+- Neue Verwaltung im selben Design: Übersicht, Geräte (QR-Kopplung, OTA), Firmware mit USB-Assistent,
+  Router (Test, Auswertung, Korrektur), Gedächtnis, Skripte, Timer, Protokoll, System.
+
+**CYD-Firmware 0.3.0**
+- Oberfläche nach Entwurf (Uhr, WLAN, Reaktor, Wellenform, Start/Licht/Musik/Einstellungen), Hoch- und
+  Querformat, Umlaute; Audio in eigenen Tasks, Weckton, Push-to-Talk.
+- Erstinstallation per USB aus der Verwaltung (esptool-js + serielle Einrichtung), Updates per OTA.
+- Baut mit pioarduino 55.03.312 (Arduino-ESP32 3.3.12). Docker-Image enthält die fertige Firmware.
+
+**Build**
+- CI: Lint, Tests, Router-Auswertung, Firmware-Build mit Paket und PC-Vorschau, Image mit Rauchtest ohne GPU,
+  Tags `latest`, Version und Commit.
+
 ## 0.2.1 – Image-Build
 
 - SearXNG-Installation im Dockerfile korrigiert (Requirements vor Editable-Install).

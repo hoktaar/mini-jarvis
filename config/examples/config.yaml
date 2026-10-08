@@ -124,6 +124,19 @@ mcp_servers:
     risk: write           # Licht schalten ist harmlos; Schlösser o. Ä. per tool_risks auf critical setzen
     tool_risks: {}
 
+homeassistant:            # Kacheln im Dashboard und die Seiten „Licht“/„Musik“ auf dem CYD
+  enabled: false
+  url: http://homeassistant.local:8123
+  token_secret: homeassistant_token   # Langzeit-Token (HA → Profil → Sicherheit)
+  verify_tls: true
+  entities:               # nur diese Entitäten sind sichtbar und schaltbar
+    - light.wohnzimmer
+    - switch.kaffeemaschine
+    - scene.filmabend
+    - media_player.wohnzimmer
+    - climate.schlafzimmer
+    - sensor.aussentemperatur
+
 news:
   feeds:
     - name: Tagesschau

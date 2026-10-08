@@ -9,7 +9,8 @@ ARG CUDA_IMAGE=nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
 # 1) CYD-Firmware bauen (für das Flashen aus der Web-UI und OTA-Updates)
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim AS firmware
-RUN pip install --no-cache-dir "platformio==6.1.19"
+# pioarduino 55.x braucht PlatformIO Core ≥ 6.2
+RUN pip install --no-cache-dir "platformio==6.2.0"
 COPY firmware/cyd /src/cyd
 WORKDIR /src/cyd
 RUN pio run -e cyd -e cyd-st7789 \
@@ -68,7 +69,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH="/opt/venv/bin:$PATH"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 supervisor haproxy libgomp1 libsndfile1 curl ca-certificates tzdata \
+        python3 supervisor haproxy libgomp1 libsndfile1 libasound2t64 curl ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Benutzer für die Rechtetrennung

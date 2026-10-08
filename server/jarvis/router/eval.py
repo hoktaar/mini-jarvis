@@ -76,14 +76,17 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--trigram", action="store_true", help="ohne Embedding-Modell auswerten")
     ap.add_argument("--file", default=str(EVAL_FILE))
+    ap.add_argument("--config-dir", type=Path, default=None, help="Standard: /config, sonst die Beispielkonfiguration")
+    ap.add_argument("--min", type=float, default=0.0, help="Mindest-Trefferquote, sonst Exit-Code 1 (für CI)")
     a = ap.parse_args()
 
-    from jarvis.config import CONFIG_DIR, load_config, load_yaml
+    from jarvis.config import CONFIG_DIR, EXAMPLES_DIR, load_config, load_yaml
     from jarvis.router.classifier import LocalExampleClassifier
     from jarvis.router.router import load_intents
 
-    cfg = load_config(CONFIG_DIR)
-    intents = load_intents(load_yaml("intents.yaml", CONFIG_DIR))
+    config_dir = a.config_dir or (CONFIG_DIR if (CONFIG_DIR / "intents.yaml").exists() else EXAMPLES_DIR)
+    cfg = load_config(config_dir)
+    intents = load_intents(load_yaml("intents.yaml", config_dir))
     model = None if a.trigram else cfg.router.embedding_model
     clf = LocalExampleClassifier({n: i.examples for n, i in intents.items()}, embedding_model=model,
                                  floor=cfg.router.similarity_floor, ref=cfg.router.similarity_ref)
@@ -93,6 +96,8 @@ def main() -> None:
     print(f"Trefferquote: {report.accuracy:.1%}   Schnellweg: {report.fast / max(1, report.total):.1%}")
     for text, exp, got, conf in report.errors:
         print(f"  ✗ {text!r}: erwartet {exp}, erkannt {got} ({conf:.2f})")
+    if report.accuracy < a.min:
+        raise SystemExit(f"Trefferquote {report.accuracy:.1%} liegt unter {a.min:.0%}")
 
 
 if __name__ == "__main__":

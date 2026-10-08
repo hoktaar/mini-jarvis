@@ -30,7 +30,8 @@ gpu = [
   "pipecat-ai[whisper,piper]==1.12.*",
   "sentence-transformers>=3",
 ]
-cloud = ["pipecat-ai[anthropic,openai,jev]==1.12.*"]
+# Cloud-Anbieter: LLM (Anthropic, OpenAI & kompatible, Google, Mistral, Groq), Sprache (Deepgram, Azure, Google)
+cloud = ["pipecat-ai[anthropic,openai,google,mistral,groq,deepgram,azure,jev]==1.12.*"]
 chat = ["matrix-nio>=0.24", "python-telegram-bot>=21", "soundfile>=0.12", "soxr>=0.3"]
 extras = ["caldav>=1.3"]
 selftest = ["soundfile>=0.12", "soxr>=0.3", "websockets>=12"]

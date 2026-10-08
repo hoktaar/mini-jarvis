@@ -285,6 +285,15 @@ class JarvisSession:
         self.device = self.services.devices.update(self.device.id, settings={"private": bool(enabled)})
         self.turn.private_mode = bool(enabled)
         await self.emit({"type": "private", "value": bool(enabled)})
+        speech = self.cloud_speech()
+        if enabled and speech:
+            await self.emit({"type": "notice", "text": f"Privatmodus an – {speech} läuft aber weiter über die Cloud."})
+
+    def cloud_speech(self) -> str:
+        """Spracherkennung/-ausgabe über Cloud-Dienste? (Privatmodus schaltet nur Sprachmodell und Werkzeuge um.)"""
+        p = self.services.cfg.providers
+        parts = [name for name, c in (("Spracherkennung", p.stt), ("Sprachausgabe", p.tts)) if c.cloud]
+        return " und ".join(parts)
 
     async def set_volume(self, value) -> int | None:
         if not self.device.satellite:

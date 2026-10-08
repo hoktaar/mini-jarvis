@@ -448,6 +448,8 @@ def config_warnings(cfg: JarvisConfig, secrets_map: dict[str, str]) -> list[str]
     ha = cfg.homeassistant
     if ha.enabled and (not ha.url or ha.token_secret not in secrets_map):
         w.append("Home Assistant ist aktiviert, aber url oder Token fehlen.")
+    if ha.enabled and not ha.entities:
+        w.append("Home Assistant: keine Entitäten unter homeassistant.entities freigegeben – Dashboard und CYD zeigen nichts.")
     if cfg.push.ntfy.enabled and not cfg.push.ntfy.topic:
         w.append("ntfy ist aktiviert, aber push.ntfy.topic ist leer.")
     if cfg.adapters.telegram.enabled and "telegram_bot_token" not in secrets_map:
