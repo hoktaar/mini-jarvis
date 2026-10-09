@@ -228,6 +228,7 @@ Keinen Port ins Internet freigeben. Stattdessen Unraid → Einstellungen → **V
 
 | Problem | Lösung |
 |---|---|
+| `CUDA driver version is insufficient for CUDA runtime version` | Der NVIDIA-Treiber auf dem Server ist älter als die CUDA-Version im Image (12.6, braucht Treiber ≥ 560) – oder der Container sieht die GPU nicht. Im Plugin *Nvidia-Driver* den aktuellen Treiber wählen und neu starten; in der Vorlage `--runtime=nvidia` und `NVIDIA_VISIBLE_DEVICES` prüfen. Bis dahin läuft Whisper automatisch auf dem Prozessor. |
 | `could not select device driver "nvidia"` | Plugin *Nvidia-Driver* installieren und Docker neu starten – oder die Vorlage ohne GPU nutzen. |
 | Image lässt sich nicht laden (`unauthorized`) | Paket auf GitHub öffentlich machen: Profil → Packages → mini-jarvis → Package settings → *Change visibility* → Public. |
 | Seite zeigt lange „Jarvis startet …“ | Modelle werden geladen – Container-Log ansehen. |

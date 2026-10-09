@@ -298,3 +298,26 @@ def test_slots_now_tz():
     assert parse_datetime("Weck mich um halb sieben", now) == datetime(2026, 10, 9, 6, 30, tzinfo=TZ)
     assert parse_datetime("um sieben abends", now) == datetime(2026, 10, 8, 19, 0, tzinfo=TZ)
     assert parse_datetime("am 12.10. um 9 Uhr", now) == datetime(2026, 10, 12, 9, 0, tzinfo=TZ)
+
+
+def test_whisper_falls_back_to_cpu(monkeypatch):
+    import sys
+    import types
+
+    from jarvis import providers
+
+    loaded = []
+
+    class FakeModel:
+        def __init__(self, model, device, compute_type):
+            if device == "cuda":
+                raise RuntimeError("CUDA failed with error CUDA driver version is insufficient for CUDA runtime version")
+            loaded.append((model, device, compute_type))
+
+    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=FakeModel))
+    monkeypatch.setattr(providers, "_whisper_cache", {})
+    monkeypatch.setattr(providers, "whisper_gpu_problem", "")
+    m = providers.get_whisper_model("small", "cuda", "int8_float16")
+    assert loaded == [("small", "cpu", "int8")]
+    assert providers.get_whisper_model("small", "cuda", "int8_float16") is m      # nicht erneut laden
+    assert "Prozessor" in providers.whisper_gpu_problem

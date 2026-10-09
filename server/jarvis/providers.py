@@ -30,15 +30,35 @@ def whisper_device(cfg: JarvisConfig, gpu_busy: bool = False) -> tuple[str, str]
     return device, compute
 
 
+# Hinweis für die Verwaltung, wenn Whisper die Grafikkarte nicht nutzen konnte
+whisper_gpu_problem: str = ""
+
+
 def get_whisper_model(model: str, device: str, compute: str):
-    """WhisperModel einmal laden, danach aus dem Cache (threadsicher)."""
+    """WhisperModel einmal laden, danach aus dem Cache (threadsicher).
+
+    Scheitert die Grafikkarte (Treiber zu alt, kein GPU-Zugriff im Container), läuft Whisper auf der CPU weiter."""
+    global whisper_gpu_problem
     key = (model, device, compute)
     with _whisper_lock:
         if key not in _whisper_cache:
             from faster_whisper import WhisperModel
 
             logger.info(f"Lade Whisper {model} ({device}/{compute}) …")
-            _whisper_cache[key] = WhisperModel(model, device=device, compute_type=compute)
+            try:
+                _whisper_cache[key] = WhisperModel(model, device=device, compute_type=compute)
+            except (RuntimeError, ValueError) as e:
+                if device == "cpu":
+                    raise
+                whisper_gpu_problem = (
+                    f"Whisper konnte die Grafikkarte nicht nutzen ({e}) – läuft auf dem Prozessor. "
+                    "NVIDIA-Treiber auf dem Server aktualisieren oder GPU-Zugriff des Containers prüfen "
+                    "(Einstellungen → Sprache).")
+                logger.warning(whisper_gpu_problem)
+                cpu_key = (model, "cpu", "int8")
+                if cpu_key not in _whisper_cache:
+                    _whisper_cache[cpu_key] = WhisperModel(model, device="cpu", compute_type="int8")
+                _whisper_cache[key] = _whisper_cache[cpu_key]
             logger.info("Whisper geladen")
         return _whisper_cache[key]
 

@@ -401,6 +401,7 @@ def _device_row(d: dict) -> dict:
 
 @app.get("/api/admin/overview", dependencies=admin)
 async def overview(request: Request):
+    from jarvis import providers
     from jarvis.tls import cert_info
 
     cfg = services.cfg
@@ -411,7 +412,8 @@ async def overview(request: Request):
                  "transport": "voice" if s.voice else "chat"} for s in services.online()]
     return {
         "version": __version__, "uptime_s": int(time.time() - services.started), "timezone": cfg.location.timezone,
-        "warnings": services.warnings, "sessions": sessions, "checks": reachable,
+        "warnings": services.warnings + ([providers.whisper_gpu_problem] if providers.whisper_gpu_problem else []),
+        "sessions": sessions, "checks": reachable,
         "providers": {
             "llm_primary": p.llm.primary,
             "llm_local": f"{p.llm.local.model} (Ollama)" if p.llm.local.enabled else "aus",
