@@ -122,7 +122,7 @@ def test_cloud_only_config():
     assert len(cloud_services(cfg)) == 3
     assert shell_env(cfg)["JARVIS_OLLAMA_AUTOSTART"] == "false"
     w = " ".join(config_warnings(cfg, {"openai_api_key": "x"}))
-    assert "deepgram_api_key" in w and "elevenlabs_api_key" in w and "openai_api_key" not in w
+    assert "über Deepgram" in w and "über ElevenLabs" in w and "OpenAI" not in w
 
 
 # ---------------------------------------------------------------- Datenbank

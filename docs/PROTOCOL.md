@@ -10,7 +10,8 @@ Jedes Gerät hat ein eigenes Token (Verwaltung → Geräte). Der Server speicher
 | Einmal-Ticket | Browser (WebSockets können keine Header) | `POST /api/ws-ticket` mit Bearer → `{"ticket"}`, 60 s gültig, einmal nutzbar: `/ws/client?ticket=…` |
 | `?token=…` | ältere Firmware | weiterhin erlaubt, wird im Log geschwärzt |
 
-Verwaltung: Header `X-Admin-Token` (steht in `/config/secrets.yaml`). Fehlversuche werden gebremst.
+Verwaltung: Header `X-Admin-Token` (beim ersten Start im Container-Log, gespeichert in `/config/secrets.yaml`).
+Fehlversuche werden gebremst.
 
 ## 1. RTVI (PWA, Android, Desktop)
 
@@ -79,4 +80,10 @@ WLAN-Zugangsdaten gehen dabei nur über USB an das Gerät.
 | GET | `/api/dashboard` | Gerät | alles fürs Dashboard (Wetter, Geräte, Systemwerte, Aufgaben, Feed, Smarthome) |
 | POST | `/api/home/{entity}/toggle` | Gerät | Kachel schalten |
 | GET | `/api/firmware/{variante}/{datei}.bin` | Gerät oder Admin | OTA und Web-Flasher |
-| * | `/api/admin/*` | Admin | Übersicht, Geräte (+ `rotate`, `ota`), Firmware (+ `upload`, `manifest`), Router (`router-log`, `correct`, `test`, `eval`, `retrain`), Gedächtnis, Skripte (+ `run`), Timer, Protokoll, Konfiguration, `reload`, `provision-info` |
+| * | `/api/admin/*` | Admin | Übersicht, Geräte (+ `rotate`, `ota`), Firmware (+ `upload`, `manifest`), Router (`router-log`, `correct`, `test`, `eval`, `retrain`), Absichten (+ eigene Beispielsätze), Gedächtnis, Skripte (+ `run`, anlegen/ändern/entfernen, `script-files`), Timer, Protokoll, `reload`, `provision-info` |
+| GET/PUT | `/api/admin/settings` | Admin | Einstellungen lesen (Schlüssel nur als „gesetzt“) bzw. ändern: `{"changes": {"pfad.zum.wert": …}, "secrets": {"name": "…"}, "whitelist": {"container": ["status", …]}}` – Fehler je Feld als `detail.errors` |
+| POST | `/api/admin/restart` | Admin | Jarvis neu starten (gleicher Prozess, liest die Einstellungen neu); `/api/health` liefert danach ein neues `boot` |
+| POST | `/api/admin/token/rotate` | Admin | neuen Admin-Token erzeugen |
+| GET/POST | `/api/admin/ollama`, `/api/admin/ollama/pull` | Admin | Modelle des (lokalen) Ollama anzeigen bzw. herunterladen (Fortschritt per GET) |
+| POST | `/api/admin/homeassistant/test` | Admin | Verbindung prüfen und Entitäten zur Auswahl laden |
+| GET | `/api/admin/geocode?q=` | Admin | Ortssuche (Open-Meteo) für den Standort |

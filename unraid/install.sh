@@ -102,9 +102,12 @@ $(printf '\033[1m')Fertig. Nächste Schritte:$(printf '\033[0m')
   1. Unraid → Docker → „Container hinzufügen“ → Vorlage „$NAME“ (Benutzervorlagen) → Anwenden.
      Der erste Start lädt Modelle (mehrere GB) – Fortschritt im Container-Log.
   2. Web-UI: https://${HOSTS%%,*}:8443/  (Zertifikatswarnung einmal bestätigen)
-  3. Admin-Token:  docker exec $NAME grep admin_token /config/secrets.yaml
+  3. Admin-Token: steht beim ersten Start im Container-Log (Docker → $NAME → Log),
+     später: docker exec $NAME grep admin_token /config/secrets.yaml
   4. Verwaltung → Übersicht → „CA-Zertifikat laden“ und auf allen Geräten installieren.
-  5. Konfiguration: $APPDATA/config/config.yaml (danach Container neu starten).
+  5. Verwaltung → Einstellungen: Ort, Sprachmodell, Schlüssel, Home Assistant – ohne Dateien zu bearbeiten.
+
+Hinweis: Mini-Jarvis ist Work in Progress – vor Updates $APPDATA/config sichern.
 
 Anleitung: https://github.com/$REPO/blob/$BRANCH/docs/UNRAID.md
 EOF

@@ -45,6 +45,14 @@
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
     <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21m-3.5 0h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4m8-4v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Zm4 4a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10m4 0h2M4 17h4m4 0h8M14 4v6M8 14v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   </svg>
 
@@ -62,8 +70,8 @@
       <button class="btn primary big">Anmelden</button>
       <details class="hint-box">
         <summary>Wo finde ich den Token?</summary>
-        <p>Er steht in <code>/config/secrets.yaml</code> unter <code>admin_token</code> und wird beim ersten Start automatisch erzeugt.
-          Im Terminal: <code>docker exec jarvis grep admin_token /config/secrets.yaml</code></p>
+        <p>Jarvis erzeugt ihn beim ersten Start und schreibt ihn ins Container-Log (Unraid: Docker → mini-jarvis → Log).
+          Später im Terminal: <code>docker exec mini-jarvis grep admin_token /config/secrets.yaml</code></p>
       </details>
       <a class="link" href="/">Zurück zu Jarvis</a>
     </form>
@@ -78,6 +86,7 @@
       </a>
       <nav class="nav" id="nav">
         <button data-page="overview" title="Übersicht"><svg><use href="#i-dash"/></svg><span>Übersicht</span></button>
+        <button data-page="settings" title="Einstellungen"><svg><use href="#i-sliders"/></svg><span>Einstellungen</span></button>
         <button data-page="devices" title="Geräte"><svg><use href="#i-devices"/></svg><span>Geräte</span></button>
         <button data-page="firmware" title="Firmware"><svg><use href="#i-chip"/></svg><span>Firmware</span></button>
         <button data-page="router" title="Router"><svg><use href="#i-route"/></svg><span>Router</span></button>
@@ -139,6 +148,21 @@
             <header><h2><svg><use href="#i-devices"/></svg>Aktive Sitzungen</h2></header>
             <ul class="rows" id="ov-sessions"></ul>
           </section>
+        </div>
+      </section>
+
+      <!-- ---------- Einstellungen ---------- -->
+      <section class="page" data-page="settings" hidden>
+        <div class="set-layout">
+          <nav class="set-nav panel" id="set-nav" aria-label="Bereiche der Einstellungen"></nav>
+          <div class="set-main">
+            <div class="set-body" id="set-body"><p class="muted">Lade Einstellungen …</p></div>
+            <div class="set-bar" id="set-bar" role="region" aria-label="Ungespeicherte Änderungen" hidden>
+              <span id="set-bar-text"></span>
+              <button class="btn ghost" id="set-discard" type="button">Verwerfen</button>
+              <button class="btn primary" id="set-save" type="button"><svg><use href="#i-check"/></svg>Speichern</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -222,7 +246,7 @@
           <button class="btn small ghost more" id="rt-more">Ältere laden</button>
         </section>
         <section class="panel">
-          <header><h2><svg><use href="#i-list"/></svg>Absichten</h2></header>
+          <header><h2><svg><use href="#i-list"/></svg>Absichten</h2><small>Antippen, um eigene Beispielsätze zu lernen</small></header>
           <div class="chips" id="rt-intents"></div>
         </section>
       </section>
@@ -241,7 +265,11 @@
 
       <!-- ---------- Skripte ---------- -->
       <section class="page" data-page="scripts" hidden>
-        <p class="muted page-note">Skripte stehen in <code>/config/scripts.yaml</code> und laufen getrennt im Runner. Jarvis darf sie nur mit den hier gezeigten Parametern aufrufen.</p>
+        <section class="panel">
+          <header><h2><svg><use href="#i-terminal"/></svg>Eigene Skripte</h2><button class="btn small primary" id="sc-new" type="button"><svg><use href="#i-new"/></svg>Skript freigeben</button></header>
+          <ul class="rows" id="sc-errors" hidden></ul>
+          <p class="small muted">Skripte liegen im Skript-Ordner des Containers (Unraid: <code>appdata/mini-jarvis/scripts</code>) und laufen getrennt im Runner. Jarvis darf nur freigegebene Skripte starten – und nur mit den Angaben, die du hier erlaubst.</p>
+        </section>
         <div class="cards" id="sc-list"></div>
       </section>
 
@@ -266,18 +294,25 @@
       <section class="page" data-page="system" hidden>
         <div class="cards">
           <section class="panel">
-            <header><h2><svg><use href="#i-refresh"/></svg>Neu einlesen</h2></header>
-            <p class="small">Lädt <code>intents.yaml</code>, <code>scripts.yaml</code> und die Router-Beispiele neu – ohne Neustart. Änderungen an <code>config.yaml</code> und <code>secrets.yaml</code> brauchen einen Neustart des Containers.</p>
-            <button class="btn" id="sys-reload"><svg><use href="#i-refresh"/></svg>Jetzt neu einlesen</button>
-            <p class="small" id="sys-reload-out" role="status"></p>
+            <header><h2><svg><use href="#i-refresh"/></svg>Neustart</h2></header>
+            <p class="small">Jarvis liest die Einstellungen beim Start. Nach dem Speichern zeigt die Verwaltung oben einen Hinweis – oder du startest hier neu. Geräte verbinden sich danach von selbst wieder.</p>
+            <button class="btn primary" id="sys-restart" type="button"><svg><use href="#i-refresh"/></svg>Jarvis neu starten</button>
           </section>
           <section class="panel">
-            <header><h2><svg><use href="#i-key"/></svg>Geheimnisse</h2><small>nur Namen, keine Werte</small></header>
-            <div class="chips" id="sys-secrets"></div>
+            <header><h2><svg><use href="#i-key"/></svg>Admin-Token</h2></header>
+            <p class="small">Mit diesem Token meldest du dich hier an. Erzeuge einen neuen, falls er in falsche Hände geraten sein könnte.</p>
+            <button class="btn" id="sys-token" type="button"><svg><use href="#i-key"/></svg>Neuen Token erzeugen</button>
+            <p class="muted small" id="sys-token-note"></p>
+          </section>
+          <section class="panel">
+            <header><h2><svg><use href="#i-refresh"/></svg>Neu einlesen</h2></header>
+            <p class="small">Nur nötig, wenn jemand Dateien im Konfigurationsordner von Hand geändert hat: liest Absichten, Skripte und Container-Freigaben neu ein.</p>
+            <button class="btn" id="sys-reload" type="button"><svg><use href="#i-refresh"/></svg>Neu einlesen</button>
+            <p class="small" id="sys-reload-out" role="status"></p>
           </section>
         </div>
         <section class="panel">
-          <header><h2><svg><use href="#i-settings"/></svg>Aktive Konfiguration</h2><small>Werte aus <code>config.yaml</code> nach Umgebungsvariablen</small></header>
+          <header><h2><svg><use href="#i-settings"/></svg>Konfiguration (Rohansicht)</h2><small>Gespeicherte Werte – ändern unter „Einstellungen“</small></header>
           <div class="config-tree" id="sys-config"></div>
         </section>
       </section>
@@ -295,6 +330,13 @@
       <menu class="sheet-actions"><button class="btn ghost" value="cancel">Abbrechen</button><button class="btn danger" value="ok" id="confirm-ok">Ja</button></menu>
     </form>
   </dialog>
+  <div class="restart-overlay" id="restart-overlay" hidden>
+    <div class="panel restart-card" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <h2 id="restart-title">Jarvis startet neu …</h2>
+      <p class="muted" id="restart-text"></p>
+    </div>
+  </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
   <script src="admin.js" type="module"></script>

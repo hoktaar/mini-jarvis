@@ -321,10 +321,10 @@ def _interpolate(value: Any, secrets_map: dict[str, str]) -> Any:
     return value
 
 
-def ensure_config_dir(config_dir: Path = CONFIG_DIR) -> None:
-    """Beim ersten Start Beispiele kopieren und Admin-Token erzeugen.
+def ensure_config_dir(config_dir: Path = CONFIG_DIR) -> str | None:
+    """Beim ersten Start Beispiele kopieren und Admin-Token erzeugen (gibt einen neuen Token zurück).
 
-    Im Container läuft das als root im Entrypoint; der Core selbst hat /config nur lesend.
+    Im Container läuft das als root im Entrypoint.
     """
     config_dir.mkdir(parents=True, exist_ok=True)
     if EXAMPLES_DIR.exists():
@@ -340,11 +340,13 @@ def ensure_config_dir(config_dir: Path = CONFIG_DIR) -> None:
             f.write("# Niemals committen! Admin-Token wurde beim ersten Start erzeugt.\n")
             yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
         os.chmod(secrets_path, 0o600)
+        return data["admin_token"]
+    return None
 
 
-def load_secrets(config_dir: Path = CONFIG_DIR) -> dict[str, str]:
-    data = _read_yaml(config_dir / "secrets.yaml")
-    # Umgebungsvariablen (z. B. aus dem Unraid-Template) haben Vorrang: JARVIS_<NAME>.
+def secrets_with_env(data: dict[str, Any]) -> dict[str, str]:
+    """Umgebungsvariablen (z. B. aus dem Unraid-Template) haben Vorrang: JARVIS_<NAME>."""
+    data = dict(data)
     names = set(data) | {"admin_token", "telegram_bot_token", "matrix_password", "homeassistant_token",
                          "caldav_password", "ntfy_token", "typesafe_api_key", *SECRET_NAMES.values()}
     for key in names:
@@ -352,6 +354,10 @@ def load_secrets(config_dir: Path = CONFIG_DIR) -> dict[str, str]:
         if env:
             data[key] = env
     return {k: str(v) for k, v in data.items() if v not in (None, "")}
+
+
+def load_secrets(config_dir: Path = CONFIG_DIR) -> dict[str, str]:
+    return secrets_with_env(_read_yaml(config_dir / "secrets.yaml"))
 
 
 def load_config(config_dir: Path = CONFIG_DIR, secrets_map: dict[str, str] | None = None) -> JarvisConfig:
@@ -407,59 +413,71 @@ def cloud_services(cfg: JarvisConfig) -> list[str]:
     return out
 
 
+PROVIDER_LABELS = {
+    "anthropic": "Anthropic", "openai": "OpenAI", "google": "Google", "mistral": "Mistral", "groq": "Groq",
+    "openrouter": "OpenRouter", "deepseek": "DeepSeek", "openai_compatible": "OpenAI-kompatibel",
+    "deepgram": "Deepgram", "elevenlabs": "ElevenLabs", "cartesia": "Cartesia", "azure": "Azure",
+    "brave": "Brave", "tavily": "Tavily",
+}
+
+
 def config_warnings(cfg: JarvisConfig, secrets_map: dict[str, str]) -> list[str]:
-    """Hinweise für die Verwaltung: was fehlt oder nicht zusammenpasst."""
+    """Hinweise für die Verwaltung: was fehlt oder nicht zusammenpasst – mit dem Ort in den Einstellungen."""
     w: list[str] = []
+    label = PROVIDER_LABELS.get
     if cfg.location.latitude == 0 and cfg.location.longitude == 0:
-        w.append("Standort ist nicht gesetzt (location.latitude/longitude) – Wetter stimmt nicht.")
+        w.append("Standort ist nicht gesetzt – Wetter stimmt nicht (Einstellungen → Allgemein).")
     p = cfg.providers
     cloud = p.llm.cloud
+    llm = "(Einstellungen → Sprachmodell)"
     if cloud.enabled and not cloud.model:
-        w.append("Cloud-LLM ist aktiviert, aber providers.llm.cloud.model ist leer.")
+        w.append(f"Cloud-Sprachmodell ist eingeschaltet, aber kein Modell gewählt {llm}.")
     key = secret_name(cloud.type, cloud.api_key_secret)
     if cloud.enabled and key not in secrets_map and not (cloud.type == "openai_compatible" and cloud.base_url):
-        w.append(f"Cloud-LLM ist aktiviert, aber {key} fehlt in secrets.yaml.")
+        w.append(f"Cloud-Sprachmodell {label(cloud.type, cloud.type)}: API-Schlüssel fehlt {llm}.")
     if cloud.type == "openai_compatible" and cloud.enabled and not cloud.base_url:
-        w.append("Cloud-LLM openai_compatible braucht providers.llm.cloud.base_url.")
+        w.append(f"OpenAI-kompatibler Anbieter braucht eine Adresse {llm}.")
     if p.llm.primary == "cloud" and not cloud.enabled:
-        w.append("providers.llm.primary ist cloud, aber kein Cloud-LLM aktiviert – Jarvis nutzt das lokale Modell.")
+        w.append(f"„Cloud zuerst“ ist gewählt, aber kein Cloud-Modell eingeschaltet – Jarvis nutzt das lokale {llm}.")
     if not p.llm.local.enabled and not cloud.enabled:
-        w.append("Weder lokales noch Cloud-LLM aktiv – nur der Schnellweg (einfache Befehle) funktioniert.")
-    for role, c in (("stt", p.stt), ("tts", p.tts)):
+        w.append(f"Weder lokales noch Cloud-Sprachmodell aktiv – nur einfache Befehle funktionieren {llm}.")
+    for role, c in (("Spracherkennung", p.stt), ("Sprachausgabe", p.tts)):
         if c.cloud:
-            key = secret_name(f"google_{role}" if c.type == "google" else c.type, c.api_key_secret)
+            key = secret_name(f"google_{'stt' if c is p.stt else 'tts'}" if c.type == "google" else c.type,
+                              c.api_key_secret)
             if key not in secrets_map and not (c.type == "openai" and c.base_url):
-                w.append(f"{role.upper()}-Anbieter {c.type}: {key} fehlt in secrets.yaml.")
+                w.append(f"{role} über {label(c.type, c.type)}: API-Schlüssel fehlt (Einstellungen → Sprache).")
             if c.type == "azure" and not c.region:
-                w.append(f"{role.upper()} über Azure braucht region.")
+                w.append(f"{role} über Azure braucht eine Region (Einstellungen → Sprache).")
     if cfg.search.provider in ("brave", "tavily"):
         key = secret_name(cfg.search.provider, cfg.search.api_key_secret)
         if key not in secrets_map:
-            w.append(f"Websuche über {cfg.search.provider}: {key} fehlt in secrets.yaml.")
-        if any(m.enabled and m.name == "searxng" for m in cfg.mcp_servers):
-            w.append("Websuche ist auf einen Cloud-Anbieter gestellt, der SearXNG-MCP-Server ist aber noch aktiv.")
+            w.append(f"Websuche über {label(cfg.search.provider)}: API-Schlüssel fehlt (Einstellungen → Suche).")
     for m in cfg.mcp_servers:
         if m.enabled and m.name != "docker" and m.tools is None:
-            w.append(f"MCP-Server {m.name}: keine Tool-Allowlist (tools: […]) – alle Tools sind freigegeben.")
+            w.append(f"MCP-Server {m.name}: alle Werkzeuge freigegeben – besser eine Auswahl festlegen "
+                     "(Einstellungen → Werkzeuge).")
         if m.enabled and m.transport != "stdio" and not m.url:
-            w.append(f"MCP-Server {m.name}: transport {m.transport} braucht eine url.")
+            w.append(f"MCP-Server {m.name}: Adresse fehlt (Einstellungen → Werkzeuge).")
     if cfg.calendar.enabled and (not cfg.calendar.url or cfg.calendar.password_secret not in secrets_map):
-        w.append("Kalender ist aktiviert, aber url oder Passwort fehlen.")
+        w.append("Kalender ist eingeschaltet, aber Adresse oder Passwort fehlen (Einstellungen → Kalender).")
     ha = cfg.homeassistant
     if ha.enabled and (not ha.url or ha.token_secret not in secrets_map):
-        w.append("Home Assistant ist aktiviert, aber url oder Token fehlen.")
+        w.append("Home Assistant ist eingeschaltet, aber Adresse oder Token fehlen (Einstellungen → Smart Home).")
     if ha.enabled and not ha.entities:
-        w.append("Home Assistant: keine Entitäten unter homeassistant.entities freigegeben – Dashboard und CYD zeigen nichts.")
+        w.append("Home Assistant: noch keine Geräte ausgewählt – Dashboard und CYD zeigen nichts "
+                 "(Einstellungen → Smart Home).")
     if cfg.push.ntfy.enabled and not cfg.push.ntfy.topic:
-        w.append("ntfy ist aktiviert, aber push.ntfy.topic ist leer.")
+        w.append("ntfy ist eingeschaltet, aber das Thema fehlt (Einstellungen → Benachrichtigungen).")
     if cfg.adapters.telegram.enabled and "telegram_bot_token" not in secrets_map:
-        w.append("Telegram ist aktiviert, aber telegram_bot_token fehlt.")
+        w.append("Telegram ist eingeschaltet, aber der Bot-Token fehlt (Einstellungen → Benachrichtigungen).")
     if cfg.adapters.telegram.enabled and not cfg.adapters.telegram.allowed_user_ids:
-        w.append("Telegram ist aktiviert, aber allowed_user_ids ist leer – niemand darf schreiben.")
+        w.append("Telegram ist eingeschaltet, aber niemand ist freigegeben (Einstellungen → Benachrichtigungen).")
     if cfg.adapters.matrix.enabled and "matrix_password" not in secrets_map:
-        w.append("Matrix ist aktiviert, aber matrix_password fehlt.")
+        w.append("Matrix ist eingeschaltet, aber das Passwort fehlt (Einstellungen → Benachrichtigungen).")
     if not cfg.server.https.enabled:
-        w.append("HTTPS ist aus – Browser erlauben das Mikrofon dann nur über localhost.")
+        w.append("HTTPS ist aus – Browser erlauben das Mikrofon dann nur über localhost "
+                 "(Einstellungen → Netzwerk & Sicherheit).")
     return w
 
 
@@ -490,7 +508,12 @@ def main() -> None:
     a = ap.parse_args()
     config_dir = Path(a.config_dir)
     if a.init:
-        ensure_config_dir(config_dir)
+        token = ensure_config_dir(config_dir)
+        if token and not os.environ.get("JARVIS_ADMIN_TOKEN"):
+            line = "=" * 72
+            print(f"{line}\n Mini-Jarvis: Admin-Token für die Verwaltung (erscheint nur beim ersten Start)\n\n"
+                  f"   {token}\n\n Anmelden unter https://<server>:8443/admin.html – später unter „System“ neu erzeugbar.\n{line}",
+                  flush=True)
     if a.env:
         try:
             cfg = load_config(config_dir)

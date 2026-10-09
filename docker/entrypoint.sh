@@ -7,14 +7,23 @@ mkdir -p /config /data /models/ollama /models/piper /models/hf /scripts
 # Runner-Socket: Verzeichnis gehört runner, Gruppe jarvis (setgid → Socket erbt die Gruppe)
 install -d -o runner -g jarvis -m 2770 /run/jarvis
 
-# Beispielkonfiguration und Admin-Token beim ersten Start (als root, /config bleibt für den Core read-only)
+# Beispielkonfiguration und Admin-Token beim ersten Start (der Token steht dann im Container-Log)
 $PY -m jarvis.config --init --config-dir /config
 
 chown -R jarvis:jarvis /data /models/piper /models/hf
 chown -R ollama-svc /models/ollama
+# /config: Die Verwaltung schreibt die Einstellungen (Gruppe jarvis). JARVIS_CONFIG_READONLY=true sperrt das –
+# dann gilt nur, was in den Dateien steht.
 chown -R root:jarvis /config
-chmod -R u+rwX,g+rX,o-rwx /config
-chmod 640 /config/secrets.yaml
+if [ "${JARVIS_CONFIG_READONLY:-false}" = "true" ]; then
+  chmod -R u+rwX,g+rX,g-w,o-rwx /config
+  chmod 640 /config/secrets.yaml
+  echo "Einstellungen gesperrt (JARVIS_CONFIG_READONLY=true) – die Verwaltung zeigt sie nur an."
+else
+  chmod -R u+rwX,g+rwX,o-rwx /config
+  find /config -type d -exec chmod g+s {} +
+  chmod 660 /config/secrets.yaml
+fi
 
 # Docker-Proxy: Regeln aus der Whitelist erzeugen. Den Host-Socket NIE umbiegen –
 # stattdessen tritt der Proxy-Benutzer der Gruppe des Sockets bei.

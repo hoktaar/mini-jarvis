@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
 import logging
 import os
 import re
+import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -32,6 +34,8 @@ from jarvis.router.router import Route
 WEB_DIR = Path(__file__).parent / "web"
 services = None
 _failed_admin: dict[str, list[float]] = {}
+_servers: list = []                 # laufende uvicorn-Server (für den Neustart aus der Verwaltung)
+_restart = False
 
 
 class _RedactTokens(logging.Filter):
@@ -162,10 +166,40 @@ class Snooze(BaseModel):
     minutes: int = 5
 
 
+class SettingsIn(BaseModel):
+    changes: dict[str, Any] = Field(default_factory=dict)          # Pfad → Wert (None = Standard)
+    secrets: dict[str, str | None] = Field(default_factory=dict)   # Name → Wert ("" = löschen)
+    whitelist: dict[str, list[str]] | None = None                  # Container → Aktionen
+
+
+class ScriptIn(BaseModel):
+    path: str = Field(min_length=1, max_length=300)
+    description: str = ""
+    confirm: bool = True
+    car_allowed: bool = False
+    timeout: int = 60
+    params: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+
+class ExampleIn(BaseModel):
+    text: str = Field(min_length=2, max_length=200)
+
+
+class PullIn(BaseModel):
+    model: str = Field(min_length=1, max_length=120)
+    base_url: str = ""
+
+
+class HaTest(BaseModel):
+    url: str = ""
+    token: str = ""
+    verify_tls: bool = True
+
+
 # --------------------------------------------------------------------------- Öffentlich
 @app.get("/api/health")
 async def health():
-    return {"ok": True, "version": __version__}
+    return {"ok": True, "version": __version__, "boot": int(services.started)}
 
 
 @app.get("/api/info")
@@ -393,7 +427,17 @@ async def overview(request: Request):
         "https": {"enabled": cfg.server.https.enabled, "port": cfg.server.https.port,
                   "url": _pair_base(request), "cert": cert_info(Path(DATA_DIR) / "tls" / "server.crt")},
         "timers": len(services.timers.active()), "ringing": len(services.timers.ringing()),
+        "restart_pending": _restart_pending(),
     }
+
+
+def _restart_pending() -> dict:
+    """Hinweis für die Verwaltung: Neustart von Jarvis bzw. des Containers nötig?"""
+    from jarvis.settings import container_restart_reasons
+
+    pending = services.restart_pending
+    # Nach einem Neustart von Jarvis wirkt die neue Konfiguration – eingebettete Dienste aber erst mit dem Container.
+    return {"core": pending["core"], "container": pending["container"] or container_restart_reasons(services.cfg)}
 
 
 async def _service_checks() -> dict:
@@ -630,7 +674,7 @@ async def audit(limit: int = 50, offset: int = 0):
 
 @app.get("/api/admin/scripts", dependencies=admin)
 async def scripts():
-    return [{"id": s.id, "description": s.description, "confirm": s.confirm, "car_allowed": s.car_allowed,
+    return [{"id": s.id, "path": s.path, "description": s.description, "confirm": s.confirm, "car_allowed": s.car_allowed,
              "timeout": s.timeout, "params": {k: vars(p) for k, p in s.params.items()}}
             for s in services.scripts.values()]
 
@@ -662,35 +706,351 @@ async def memory_delete(memory_id: int):
     return {"ok": services.memory.delete(memory_id)}
 
 
-@app.get("/api/admin/config", dependencies=admin)
-async def config_view():
-    data = services.cfg.model_dump(mode="json")
-    for m in data.get("mcp_servers", []):
-        m["headers"] = {k: "***" for k in m.get("headers", {})}
-        m["env"] = {k: ("***" if any(w in k.lower() for w in ("key", "token", "secret", "pass")) else v)
-                    for k, v in m.get("env", {}).items()}
-    return {"config": data, "secrets": sorted(k for k in services.secrets if k != "admin_token"),
-            "warnings": services.warnings}
+# --------------------------------------------------------------------------- Einstellungen
+def _files():
+    from jarvis.settings import ConfigFiles
+
+    return ConfigFiles(services.config_dir)
+
+
+def _settings_http(e) -> HTTPException:
+    return HTTPException(e.status, {"message": e.message, "errors": e.errors})
+
+
+def _reload_runtime() -> None:
+    """Skripte, Whitelist-Namen, Absichten und Router-Beispiele neu einlesen – ohne Neustart."""
+    from jarvis.config import load_yaml
+    from jarvis.runner.registry import load_registry
+    from jarvis.settings import scripts_root
+
+    errors: list[str] = []
+    services.scripts = load_registry(load_yaml("scripts.yaml", services.config_dir), scripts_root(), errors)
+    services.script_errors = errors
+    services.router = build_router(services, services.config_dir)
+    for s in services.sessions.values():
+        s.router = services.router
+        s.classifier = services.classifier
+
+
+# Einstellungen, die sofort wirken (alles andere braucht einen Neustart von Jarvis)
+LIVE_PATHS = {"firmware.auto_update", "privacy.retention_days"}
+
+
+@app.get("/api/admin/settings", dependencies=admin)
+async def settings_get():
+    from jarvis import settings as st
+
+    files = _files()
+    try:
+        values = st.config_values(files)
+        secrets = st.secret_status(files)
+        whitelist = st.whitelist_values(files)
+    except st.SettingsError as e:
+        raise _settings_http(e) from e
+    return {
+        "values": values, "secrets": secrets, "secret_names": st.secret_names(), "whitelist": whitelist,
+        "readonly": files.readonly_reason(), "restart_pending": _restart_pending(),
+        "locked": st.LOCKED_PATHS, "timezones": st.timezones(), "warnings": services.warnings,
+        "env": {"hosts": os.environ.get("JARVIS_HOSTS", ""), "public_url": os.environ.get("JARVIS_PUBLIC_URL", ""),
+                "admin_token": bool(st.env_secret("admin_token"))},
+    }
+
+
+@app.put("/api/admin/settings", dependencies=admin)
+async def settings_put(body: SettingsIn):
+    from jarvis import settings as st
+    from jarvis.config import config_warnings, secrets_with_env
+
+    files = _files()
+    try:
+        reason = files.readonly_reason()
+        if reason:
+            raise st.SettingsError(reason, status=409)
+        raw = files.load("config.yaml")
+        st.apply_changes(raw, body.changes)
+        raw_secrets = files.load("secrets.yaml")
+        st.apply_secrets(raw_secrets, body.secrets)
+        secrets_map = secrets_with_env(st.plain(raw_secrets))
+        cfg = st.validate(raw, secrets_map)
+        raw_wl = None
+        if body.whitelist is not None:
+            raw_wl = files.load("whitelist.yaml")
+            st.apply_whitelist(raw_wl, body.whitelist)
+        # Erst alles prüfen, dann schreiben
+        if body.secrets:
+            files.save("secrets.yaml", raw_secrets)
+        if body.changes:
+            files.save("config.yaml", raw)
+        if raw_wl is not None:
+            files.save("whitelist.yaml", raw_wl)
+    except st.SettingsError as e:
+        raise _settings_http(e) from e
+
+    if raw_wl is not None:
+        _reload_runtime()                          # neue Containernamen kennt der Router sofort
+    live = set(body.changes) <= LIVE_PATHS and not body.secrets
+    if live:
+        services.cfg.firmware.auto_update = cfg.firmware.auto_update
+        services.cfg.privacy.retention_days = cfg.privacy.retention_days
+        services.firmware.auto_update = cfg.firmware.auto_update
+    elif body.changes or body.secrets:
+        services.restart_pending["core"] = True
+    services.restart_pending["container"] = st.container_restart_reasons(cfg)
+    services.warnings = config_warnings(cfg, secrets_map)
+    what = sorted(body.changes) + [f"Geheimnis {n}" for n in sorted(body.secrets)]
+    if body.whitelist is not None:
+        what.append("Container-Freigaben")
+    services.db.audit("admin", "settings", ", ".join(what)[:500] or "–")
+    return {"ok": True, "restart_pending": _restart_pending(), "warnings": services.warnings,
+            "secrets": st.secret_status(files), "values": st.config_values(files)}
+
+
+@app.post("/api/admin/restart", dependencies=admin)
+async def restart_core():
+    if not _servers:
+        raise HTTPException(409, "Neustart geht nur, wenn Jarvis als Server läuft.")
+    services.db.audit("admin", "restart", "Jarvis neu starten")
+    services.feed.add("Jarvis startet neu …", "info", "system")
+
+    def go() -> None:
+        global _restart
+        _restart = True
+        for server in _servers:
+            server.should_exit = True
+
+    asyncio.get_running_loop().call_later(0.4, go)
+    return {"ok": True}
+
+
+@app.post("/api/admin/token/rotate", dependencies=admin)
+async def rotate_admin_token():
+    import secrets as pysecrets
+
+    from ruamel.yaml.scalarstring import DoubleQuotedScalarString
+
+    from jarvis import settings as st
+
+    if st.env_secret("admin_token"):
+        raise HTTPException(409, "Der Admin-Token kommt aus JARVIS_ADMIN_TOKEN (Container-Vorlage) "
+                                 "und lässt sich nur dort ändern.")
+    files = _files()
+    token = pysecrets.token_urlsafe(32)
+    try:
+        raw = files.load("secrets.yaml")
+        raw["admin_token"] = DoubleQuotedScalarString(token)
+        files.save("secrets.yaml", raw)
+    except st.SettingsError as e:
+        raise _settings_http(e) from e
+    services.secrets["admin_token"] = token
+    services.db.audit("admin", "admin_token", "neu erzeugt")
+    return {"token": token}
 
 
 @app.post("/api/admin/reload", dependencies=admin)
 async def reload_config():
-    """Absichten, Whitelist und Skripte neu einlesen (Konfiguration selbst braucht einen Neustart)."""
-    from jarvis.config import load_yaml
-    from jarvis.runner.registry import load_registry
-
-    config_dir = services.config_dir
+    """Absichten, Container-Freigaben und Skripte neu einlesen (ohne Neustart)."""
     try:
-        services.scripts = load_registry(load_yaml("scripts.yaml", config_dir))
+        _reload_runtime()
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(400, f"scripts.yaml fehlerhaft: {e}") from e
-    services.router = build_router(services, config_dir)
-    for s in services.sessions.values():
-        s.router = services.router
-        s.classifier = services.classifier
-    services.db.audit("admin", "reload", "intents, whitelist, scripts")
-    return {"ok": True, "intents": len(services.router.intents) if services.router else 0,
-            "hint": "Container-Whitelist für den Docker-Proxy wirkt erst nach einem Neustart."}
+        raise HTTPException(400, f"Neu einlesen fehlgeschlagen: {e}") from e
+    services.db.audit("admin", "reload", "Absichten, Freigaben, Skripte")
+    return {"ok": True, "intents": len(services.router.intents) if services.router else 0}
+
+
+# ---- Skripte
+@app.get("/api/admin/script-files", dependencies=admin)
+async def script_files():
+    from jarvis import settings as st
+
+    return {"root": st.scripts_root(), "files": st.script_files(), "readonly": _files().readonly_reason(),
+            "errors": services.script_errors}
+
+
+@app.put("/api/admin/scripts/{script_id}", dependencies=admin)
+async def script_save(script_id: str, body: ScriptIn):
+    from jarvis import settings as st
+
+    files = _files()
+    try:
+        raw = files.load("scripts.yaml")
+        st.apply_script(raw, script_id, body.model_dump())
+        files.save("scripts.yaml", raw)
+    except st.SettingsError as e:
+        raise _settings_http(e) from e
+    _reload_runtime()
+    services.db.audit("admin", "script_save", script_id)
+    return {"ok": True}
+
+
+@app.delete("/api/admin/scripts/{script_id}", dependencies=admin)
+async def script_delete(script_id: str):
+    from jarvis import settings as st
+
+    files = _files()
+    try:
+        raw = files.load("scripts.yaml")
+        st.apply_script(raw, script_id, None)
+        files.save("scripts.yaml", raw)
+    except st.SettingsError as e:
+        raise _settings_http(e) from e
+    _reload_runtime()
+    services.db.audit("admin", "script_delete", script_id)
+    return {"ok": True}
+
+
+# ---- Eigene Beispielsätze je Absicht
+@app.get("/api/admin/intents/{name}", dependencies=admin)
+async def intent_detail(name: str):
+    intent = services.router.intents.get(name) if services.router else None
+    if intent is None:
+        raise HTTPException(404, "Absicht nicht gefunden")
+    custom = [dict(r) for r in services.db.query(
+        "SELECT id, text, created FROM intent_examples WHERE intent = ? ORDER BY id", (name,))]
+    return {"name": name, "tool": intent.tool, "fast": intent.fast, "examples": list(intent.examples), "custom": custom}
+
+
+@app.post("/api/admin/intents/{name}/examples", dependencies=admin)
+async def intent_example_add(name: str, body: ExampleIn):
+    if not services.router or name not in services.router.intents:
+        raise HTTPException(404, "Absicht nicht gefunden")
+    services.db.execute("INSERT OR IGNORE INTO intent_examples (intent, text, created) VALUES (?,?,?)",
+                        (name, body.text.strip(), time.time()))
+    services.router.retrain(services.extra_examples())
+    services.db.audit("admin", "intent_example", f"{name}: {body.text.strip()[:80]}")
+    return {"ok": True}
+
+
+@app.delete("/api/admin/intents/examples/{example_id}", dependencies=admin)
+async def intent_example_delete(example_id: int):
+    services.db.execute("DELETE FROM intent_examples WHERE id = ?", (example_id,))
+    if services.router:
+        services.router.retrain(services.extra_examples())
+    return {"ok": True}
+
+
+# ---- Lokales Sprachmodell (Ollama): Modelle anzeigen und laden
+def _ollama_base(base_url: str = "") -> str:
+    base = (base_url or services.cfg.providers.llm.local.base_url).strip().rstrip("/").removesuffix("/v1")
+    if not re.match(r"^https?://[^\s/]+", base):
+        raise HTTPException(400, "Adresse muss mit http:// oder https:// beginnen.")
+    return base
+
+
+@app.get("/api/admin/ollama", dependencies=admin)
+async def ollama_models(base_url: str = ""):
+    import httpx
+
+    base = _ollama_base(base_url)
+    try:
+        async with httpx.AsyncClient(timeout=4) as c:
+            r = await c.get(f"{base}/api/tags")
+            r.raise_for_status()
+        models = [{"name": m.get("name", ""), "size": m.get("size", 0), "modified": m.get("modified_at", "")}
+                  for m in r.json().get("models", [])]
+        return {"ok": True, "base": base, "models": sorted(models, key=lambda m: m["name"]), "pull": services.ollama_pull}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "base": base, "models": [], "pull": services.ollama_pull,
+                "error": f"Ollama unter {base} nicht erreichbar ({type(e).__name__})."}
+
+
+async def _pull(base: str, model: str) -> None:
+    import httpx
+
+    state = services.ollama_pull
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30, read=None)) as c, \
+                c.stream("POST", f"{base}/api/pull", json={"model": model, "stream": True}) as r:
+            r.raise_for_status()
+            async for line in r.aiter_lines():
+                if not line.strip():
+                    continue
+                msg = json.loads(line)
+                if msg.get("error"):
+                    state["error"] = msg["error"]
+                    break
+                state["status"] = msg.get("status", state["status"])
+                if msg.get("total"):
+                    state["total"], state["completed"] = msg["total"], msg.get("completed", 0)
+        if not state["error"]:
+            state["status"] = "fertig"
+            services.feed.add(f"Modell {model} geladen", "ok", "system")
+    except Exception as e:  # noqa: BLE001
+        state["error"] = f"{type(e).__name__}: {e}"
+    finally:
+        state["done"] = True
+
+
+@app.post("/api/admin/ollama/pull", dependencies=admin)
+async def ollama_pull(body: PullIn):
+    model = body.model.strip()
+    if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$", model):
+        raise HTTPException(400, "Ungültiger Modellname (z. B. qwen3:8b).")
+    if services.ollama_pull and not services.ollama_pull.get("done"):
+        raise HTTPException(409, f"Es lädt gerade schon {services.ollama_pull['model']}.")
+    base = _ollama_base(body.base_url)
+    services.ollama_pull = {"model": model, "status": "startet", "completed": 0, "total": 0, "done": False, "error": ""}
+    services.ollama_pull["_task"] = asyncio.create_task(_pull(base, model))
+    services.db.audit("admin", "ollama_pull", model)
+    return {k: v for k, v in services.ollama_pull.items() if not k.startswith("_")}
+
+
+@app.get("/api/admin/ollama/pull", dependencies=admin)
+async def ollama_pull_status():
+    state = services.ollama_pull or {}
+    return {k: v for k, v in state.items() if not k.startswith("_")}
+
+
+# ---- Home Assistant: Verbindung testen und Entitäten zur Auswahl laden
+@app.post("/api/admin/homeassistant/test", dependencies=admin)
+async def homeassistant_test(body: HaTest):
+    import httpx
+
+    from jarvis.config import load_secrets
+
+    url = (body.url or services.cfg.homeassistant.url).strip().rstrip("/")
+    token = body.token.strip() or load_secrets(services.config_dir).get(services.cfg.homeassistant.token_secret, "")
+    if not re.match(r"^https?://[^\s/]+", url):
+        return {"ok": False, "error": "Adresse fehlt oder beginnt nicht mit http:// bzw. https://."}
+    if not token:
+        return {"ok": False, "error": "Token fehlt – in Home Assistant unter Profil → Sicherheit erstellen."}
+    try:
+        async with httpx.AsyncClient(base_url=url, timeout=8, verify=body.verify_tls,
+                                     headers={"Authorization": f"Bearer {token}"}) as c:
+            r = await c.get("/api/config")
+            if r.status_code == 401:
+                return {"ok": False, "error": "Home Assistant lehnt den Token ab."}
+            r.raise_for_status()
+            version = r.json().get("version", "")
+            states = (await c.get("/api/states")).json()
+    except httpx.ConnectError:
+        return {"ok": False, "error": f"Keine Verbindung zu {url}."}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": f"Fehler: {type(e).__name__}"}
+    entities = sorted(({"id": s["entity_id"], "domain": s["entity_id"].split(".", 1)[0],
+                        "name": (s.get("attributes") or {}).get("friendly_name") or s["entity_id"],
+                        "state": s.get("state", "")} for s in states if "entity_id" in s),
+                      key=lambda e: (e["domain"], e["name"].lower()))
+    return {"ok": True, "version": version, "entities": entities}
+
+
+# ---- Ortssuche für den Standort (Open-Meteo, nur auf Knopfdruck)
+@app.get("/api/admin/geocode", dependencies=admin)
+async def geocode(q: str = ""):
+    import httpx
+
+    q = q.strip()[:80]
+    if len(q) < 2:
+        return []
+    try:
+        async with httpx.AsyncClient(timeout=6) as c:
+            r = await c.get("https://geocoding-api.open-meteo.com/v1/search",
+                            params={"name": q, "count": 8, "language": "de", "format": "json"})
+            r.raise_for_status()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, "Die Ortssuche ist gerade nicht erreichbar – Koordinaten bitte von Hand eintragen.") from e
+    return [{"name": x.get("name", ""), "region": ", ".join(v for v in (x.get("admin1"), x.get("country")) if v),
+             "latitude": x.get("latitude"), "longitude": x.get("longitude"), "timezone": x.get("timezone", "")}
+            for x in r.json().get("results") or []]
 
 
 @app.get("/api/admin/firmware", dependencies=admin)
@@ -762,7 +1122,7 @@ async def _serve() -> None:
     cfg = load_config()
     port = int(os.environ.get("JARVIS_PORT", cfg.server.port))
     servers = [uvicorn.Server(uvicorn.Config(app, host=cfg.server.host, port=port, log_level="info",
-                                             ws_max_size=4 * 1024 * 1024))]
+                                             ws_max_size=4 * 1024 * 1024, timeout_graceful_shutdown=5))]
     if cfg.server.https.enabled:
         certfile, keyfile = cfg.server.https.certfile, cfg.server.https.keyfile
         if not (certfile and keyfile):
@@ -776,12 +1136,18 @@ async def _serve() -> None:
         # Zweiter Server ohne eigenen Lifespan – die Dienste baut nur der erste auf.
         servers.append(uvicorn.Server(uvicorn.Config(app, host=cfg.server.host, port=cfg.server.https.port,
                                                      log_level="info", lifespan="off", ssl_certfile=certfile,
-                                                     ssl_keyfile=keyfile, ws_max_size=4 * 1024 * 1024)))
+                                                     ssl_keyfile=keyfile, ws_max_size=4 * 1024 * 1024,
+                                                     timeout_graceful_shutdown=5)))
+    _servers[:] = servers
     await asyncio.gather(*(s.serve() for s in servers))
 
 
 def main() -> None:
     asyncio.run(_serve())
+    if _restart:
+        # Gleicher Prozess, frisch geladen: liest die gespeicherten Einstellungen neu ein.
+        logger.info("Jarvis startet neu …")
+        os.execv(sys.executable, [sys.executable, "-m", "jarvis.main"])
 
 
 if __name__ == "__main__":

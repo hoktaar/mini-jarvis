@@ -34,3 +34,11 @@ async def test_run(tmp_path):
     result = await run_script(reg, "hello", {"name": "Daniel"})
     assert result["ok"] and result["output"] == "Hallo Daniel"
     assert not (await run_script(reg, "nope", {}))["ok"]
+
+
+def test_registry_skips_broken_entries(tmp_path):
+    errors = []
+    reg = load_registry({"scripts": {"ok": {"path": str(tmp_path / "a.sh")}, "raus": {"path": "/etc/passwd"},
+                                     "kaputt": {"description": "ohne Pfad"}}}, str(tmp_path), errors)
+    assert list(reg) == ["ok"]
+    assert len(errors) == 2 and any("außerhalb" in e for e in errors) and any("path" in e for e in errors)

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.0 – Einstellungen ohne YAML
+
+**Verwaltung → Einstellungen** (neu)
+- Alle Einstellungen per Formular: Allgemein (Ortssuche füllt Koordinaten und Zeitzone), Sprachmodell (lokal und
+  Cloud, Ollama-Modelle anzeigen und herunterladen), Sprache, Suche & Nachrichten, Smart Home (Verbindung testen,
+  Geräte ankreuzen, Sprachsteuerung per HA-MCP), Kalender, Benachrichtigungen, Werkzeuge (Docker-Freigaben,
+  ComfyUI, MCP-Server), Netzwerk & Sicherheit, Schlüssel & Zugänge, Erweitert.
+- Prüfung vor dem Speichern mit Meldungen am Feld; Schlüssel werden nie angezeigt; Hinweise in der Übersicht
+  führen direkt zur passenden Stelle.
+- YAML wird rundgeschrieben: Kommentare und Reihenfolge bleiben, vor jeder Änderung eine Sicherung unter
+  `/config/backups/`.
+- **Jetzt neu starten**: Jarvis startet aus der Verwaltung neu (gleicher Prozess); Änderungen, die einen Neustart
+  des Containers brauchen, werden benannt.
+- `JARVIS_CONFIG_READONLY=true` sperrt das Schreiben (bisheriges Verhalten).
+
+**Weitere Seiten**
+- Skripte freigeben, ändern und entfernen (mit Parametern); der Runner übernimmt Änderungen sofort, fehlerhafte
+  Einträge werden übersprungen statt alle Skripte abzuschalten.
+- Router: Absicht antippen → eigene Beispielsätze lernen und löschen.
+- Firmware: automatische Updates per Schalter. System: Neustart, Admin-Token neu erzeugen, Rohansicht.
+- Container-Freigaben wirken sofort im Docker-Proxy (root-Wächter erzeugt die Regeln neu).
+
+**Betrieb und Doku**
+- Admin-Token erscheint beim ersten Start im Container-Log.
+- Rauchtest prüft Speichern einer Einstellung und Neustart im Container.
+- README und Unraid-Anleitung ohne YAML, deutlicher Hinweis „Work in Progress“.
+
 ## 0.3.0 – Vollwertiger Betrieb, Cloud-Anbieter, neue Oberflächen, CYD-Firmware
 
 **Betrieb und Sicherheit**

@@ -1,19 +1,22 @@
-// Mini-Jarvis – Verwaltung: Übersicht, Geräte, Firmware (USB-Flasher), Router, Gedächtnis, Skripte, Timer, Protokoll, System.
+// Mini-Jarvis – Verwaltung: Übersicht, Einstellungen, Geräte, Firmware (USB-Flasher), Router, Gedächtnis, Skripte,
+// Timer, Protokoll, System.
 import { initFlasher } from "./flasher.js";
 import { renderMeters } from "./hud.js";
+import { initSettings, loadSettings, sectionByTitle } from "./settings.js";
 import { $, applyTheme, el, icon, store, toast } from "./ui.js";
 
 const TOKEN_KEY = "jarvis-admin-token";
 const PAGES = {
   overview: ["Übersicht", "Zustand von Server, Diensten und KI-Anbietern"],
+  settings: ["Einstellungen", "Alles einstellen – ohne Dateien zu bearbeiten"],
   devices: ["Geräte", "Koppeln, einstellen, sperren und aktualisieren"],
   firmware: ["Firmware", "CYD per USB einrichten, Updates per WLAN (OTA)"],
   router: ["Router", "Wie Jarvis Sätze versteht – testen und korrigieren"],
   memory: ["Gedächtnis", "Fakten, die Jarvis sich gemerkt hat"],
-  scripts: ["Skripte", "Freigegebene Skripte im Runner"],
+  scripts: ["Skripte", "Welche Skripte Jarvis ausführen darf"],
   timers: ["Timer & Wecker", "Laufende und klingelnde Einträge"],
   audit: ["Protokoll", "Wer hat wann was ausgelöst"],
-  system: ["System", "Konfiguration, Geheimnisse, neu einlesen"],
+  system: ["System", "Neustart, Admin-Token, Rohansicht"],
 };
 export const KIND_NAME = {
   pwa: "Browser / PWA", cyd: "CYD-Display", esp32: "ESP32-Satellit", android: "Android", android_auto: "Android Auto",
@@ -40,13 +43,14 @@ const OTA_STATE = {
 };
 
 const S = {
-  token: "", page: "overview", ov: null, devices: [], intents: [], rtOffset: 0, auOffset: 0,
-  refreshTimer: null, theme: store.get("theme", ""), pendingProvision: null,
+  token: "", page: "overview", sub: "", ov: null, devices: [], intents: [], rtOffset: 0, auOffset: 0,
+  refreshTimer: null, theme: store.get("theme", ""), pendingProvision: null, restart: { core: false, container: [] },
+  scripts: [],
 };
 
 // ---------------------------------------------------------------- API & Anmeldung
 class ApiError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, errors = []) { super(message); this.status = status; this.errors = errors; }
 }
 
 export async function api(path, { method = "GET", body, form } = {}) {
@@ -59,7 +63,12 @@ export async function api(path, { method = "GET", body, form } = {}) {
     logout("Sitzung abgelaufen – bitte neu anmelden.");
     throw new ApiError(401, "Nicht angemeldet");
   }
-  if (!res.ok) throw new ApiError(res.status, (data && data.detail) || `Fehler ${res.status}`);
+  if (!res.ok) {
+    const d = data && data.detail;
+    if (typeof d === "string") throw new ApiError(res.status, d);
+    if (Array.isArray(d)) throw new ApiError(res.status, "Ungültige Eingabe – bitte prüfen.");
+    throw new ApiError(res.status, d?.message || `Fehler ${res.status}`, d?.errors || []);
+  }
   return data;
 }
 export const adminToken = () => S.token;
@@ -160,9 +169,11 @@ async function copy(text) {
 }
 
 // ---------------------------------------------------------------- Navigation
-function setPage(page) {
-  if (!PAGES[page]) page = "overview";
+function setPage(target) {
+  let [page, sub = ""] = String(target).split(":");
+  if (!PAGES[page]) { page = "overview"; sub = ""; }
   S.page = page;
+  S.sub = sub;
   document.body.dataset.page = page;
   document.querySelectorAll(".page").forEach((p) => { p.hidden = p.dataset.page !== page; });
   document.querySelectorAll("#nav [data-page]").forEach((b) => {
@@ -171,14 +182,16 @@ function setPage(page) {
   $("page-title").textContent = PAGES[page][0];
   $("page-sub").textContent = PAGES[page][1];
   document.title = `Jarvis – ${PAGES[page][0]}`;
-  if (location.hash.slice(1) !== page) history.replaceState(null, "", `#${page}`);
+  const hash = sub ? `${page}:${sub}` : page;
+  if (location.hash.slice(1) !== hash) history.replaceState(null, "", `#${hash}`);
   load(page);
 }
 
 async function load(page = S.page) {
   try {
-    await ({ overview: loadOverview, devices: loadDevices, firmware: loadFirmware, router: loadRouter, memory: loadMemory,
-      scripts: loadScripts, timers: loadTimers, audit: () => loadAudit(true), system: loadSystem })[page]();
+    await ({ overview: loadOverview, settings: () => loadSettings(S.sub || null), devices: loadDevices, firmware: loadFirmware,
+      router: loadRouter, memory: loadMemory, scripts: loadScripts, timers: loadTimers, audit: () => loadAudit(true),
+      system: loadSystem })[page]();
   } catch (e) {
     if (e.status !== 401) toast(e.message);
   }
@@ -199,6 +212,60 @@ async function refreshServerCard() {
   try { S.ov = await api("/api/admin/overview"); renderServerCard(); } catch { /* still */ }
 }
 
+// ---------------------------------------------------------------- Neustart
+function setRestart(pending) {
+  S.restart = pending || { core: false, container: [] };
+  renderBanners();
+}
+
+function renderBanners() {
+  const out = [];
+  if (S.restart.core) {
+    out.push(el("div", { class: "banner info" },
+      el("span", {}, el("b", {}, "Neustart nötig: "), "Gespeicherte Einstellungen wirken, sobald Jarvis neu gestartet ist."),
+      el("div", { class: "actions" }, el("button", { class: "btn small primary", onclick: restartJarvis }, icon("i-refresh"), "Jetzt neu starten"))));
+  }
+  if (S.restart.container?.length) {
+    out.push(el("div", { class: "banner" },
+      el("span", {}, el("b", {}, "Container neu starten: "), `${S.restart.container.join(", ")} – wirkt erst nach einem Neustart des Containers (Unraid: Docker → mini-jarvis → Neu starten).`)));
+  }
+  $("banners").replaceChildren(...out);
+}
+
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+async function restartJarvis() {
+  if (!await confirmDialog("Jarvis neu starten?", "Laufende Gespräche werden kurz getrennt – Geräte verbinden sich danach von selbst wieder.", "Neu starten")) return;
+  let before = null;
+  try { before = (await (await fetch("/api/health", { cache: "no-store" })).json()).boot; } catch { /* egal */ }
+  try { await api("/api/admin/restart", { method: "POST" }); } catch (e) { toast(e.message); return; }
+  const overlay = $("restart-overlay");
+  $("restart-title").textContent = "Jarvis startet neu …";
+  $("restart-text").textContent = "Das dauert meist 10 bis 30 Sekunden.";
+  overlay.hidden = false;
+  clearInterval(S.refreshTimer);
+  const t0 = Date.now();
+  await sleep(1500);
+  while (Date.now() - t0 < 180000) {
+    try {
+      const res = await fetch("/api/health", { cache: "no-store" });
+      const h = res.ok ? await res.json() : null;
+      if (h && h.boot !== before) {
+        overlay.hidden = true;
+        setRestart({ core: false, container: [] });
+        toast("Jarvis ist neu gestartet – die Einstellungen sind aktiv.");
+        start();
+        return;
+      }
+    } catch { /* noch nicht da */ }
+    $("restart-text").textContent = `Warte auf Jarvis … ${Math.round((Date.now() - t0) / 1000)} s`;
+    await sleep(1500);
+  }
+  $("restart-title").textContent = "Jarvis meldet sich nicht zurück";
+  $("restart-text").textContent = "Bitte das Container-Log prüfen. Die Seite lädt neu, sobald Jarvis wieder da ist.";
+  setTimeout(() => location.reload(), 15000);
+}
+
 function renderServerCard() {
   const ov = S.ov;
   const card = $("srv-card");
@@ -214,6 +281,7 @@ async function loadOverview() {
   const [ov, devices] = await Promise.all([api("/api/admin/overview"), api("/api/admin/devices")]);
   S.ov = ov; S.devices = devices;
   renderServerCard();
+  setRestart(ov.restart_pending);
   const active = devices.filter((d) => !d.revoked);
   const kpi = (label, value, sub) => el("div", { class: "kpi" }, el("span", {}, label), el("b", {}, value), el("small", {}, sub));
   $("ov-kpis").replaceChildren(
@@ -284,7 +352,13 @@ async function loadOverview() {
 
   // Hinweise
   $("ov-warnings").replaceChildren(...(ov.warnings.length
-    ? ov.warnings.map((w) => el("li", { class: "warn" }, el("span", { class: "ic" }, icon("i-warn")), el("span", { class: "main" }, w)))
+    ? ov.warnings.map((w) => {
+      const m = w.match(/\s*\(Einstellungen → ([^)]+)\)\.?$/);
+      const section = m ? sectionByTitle(m[1]) : null;
+      return el("li", { class: "warn" }, el("span", { class: "ic" }, icon("i-warn")),
+        el("span", { class: "main" }, m ? `${w.slice(0, m.index)}.`.replace(/\.\.$/, ".") : w),
+        section ? el("span", { class: "side" }, el("a", { class: "btn small", href: `#settings:${section}` }, "Einstellen")) : null);
+    })
     : [empty("Keine Hinweise – alles eingerichtet.")]));
 
   // HTTPS
@@ -427,8 +501,15 @@ async function otaDevice(d) {
 let flasher = null;
 async function loadFirmware() {
   const data = await api("/api/admin/firmware");
-  $("fw-auto").replaceChildren(st(data.auto_update ? "ok" : "", data.auto_update ? "Auto-Update an" : "Auto-Update aus"));
-  $("fw-auto").title = "firmware.auto_update in config.yaml";
+  const auto = el("input", { type: "checkbox", role: "switch", checked: data.auto_update, "aria-label": "Automatisch aktualisieren" });
+  auto.addEventListener("change", async () => {
+    try {
+      await api("/api/admin/settings", { method: "PUT", body: { changes: { "firmware.auto_update": auto.checked } } });
+      toast(auto.checked ? "Geräte werden automatisch aktualisiert." : "Automatische Updates aus.");
+    } catch (e) { toast(e.message); auto.checked = !auto.checked; }
+  });
+  $("fw-auto").replaceChildren(el("label", { class: "inline-field" }, el("span", {}, "Automatisch aktualisieren"),
+    el("span", { class: "toggle small" }, auto, el("span", { "aria-hidden": "true" }))));
   $("fw-variants").replaceChildren(...(data.variants.length ? data.variants.map((v) => el("li", {},
     el("span", { class: "ic" }, icon("i-chip")),
     el("span", { class: "main" }, el("b", {}, `${v.title} · ${v.version}`),
@@ -442,9 +523,44 @@ async function loadFirmware() {
 // ---------------------------------------------------------------- Router
 async function loadRouter() {
   S.intents = await api("/api/admin/intents");
-  $("rt-intents").replaceChildren(...S.intents.map((i) => el("span", { class: `chip-s${i.available ? "" : " off"}`, title: i.tool ? `Werkzeug: ${i.tool}${i.available ? "" : " (nicht verfügbar)"}` : "ohne Werkzeug" },
-    el("b", {}, i.name), `${i.examples}`, i.fast ? " · schnell" : "")));
+  $("rt-intents").replaceChildren(...S.intents.map((i) => el("button", {
+    type: "button", class: `chip-s pick${i.available ? "" : " off"}`, onclick: () => intentDialog(i.name),
+    title: `${i.tool ? `Werkzeug: ${i.tool}${i.available ? "" : " (nicht verfügbar)"}` : "Gespräch"} – Beispielsätze bearbeiten`,
+  }, el("b", {}, i.name), `${i.examples}`, i.fast ? " · schnell" : "")));
   await loadRouterLog(true);
+}
+
+async function intentDialog(name) {
+  const body = $("pair-body");
+  const draw = async () => {
+    const d = await api(`/api/admin/intents/${encodeURIComponent(name)}`);
+    const input = el("input", { class: "input", maxlength: 200, placeholder: "z. B. Mach mal Musik an", "aria-label": "Neuer Beispielsatz" });
+    const add = async (e) => {
+      e?.preventDefault();
+      const text = input.value.trim();
+      if (text.length < 2) return;
+      try { await api(`/api/admin/intents/${encodeURIComponent(name)}/examples`, { method: "POST", body: { text } }); toast("Gelernt."); await draw(); $("pair-body").querySelector("input")?.focus(); } catch (err) { toast(err.message); }
+    };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") add(e); });
+    body.replaceChildren(
+      el("h2", {}, `Absicht „${d.name}“`),
+      el("p", { class: "muted small" }, d.tool ? `Werkzeug: ${d.tool}${d.fast ? " · darf den Schnellweg nehmen" : ""}` : "Gespräch – geht an das Sprachmodell."),
+      el("h3", { class: "sub-h" }, `Eigene Beispielsätze (${d.custom.length})`),
+      el("ul", { class: "rows" }, d.custom.length ? d.custom.map((c) => el("li", {},
+        el("span", { class: "main" }, el("b", {}, c.text), el("small", {}, `gelernt ${relTime(c.created)}`)),
+        el("span", { class: "side" }, el("button", {
+          type: "button", class: "icon-btn", title: "Vergessen", "aria-label": `„${c.text}“ vergessen`,
+          onclick: async () => { await api(`/api/admin/intents/examples/${c.id}`, { method: "DELETE" }); await draw(); },
+        }, icon("i-trash"))))) : [empty("Noch keine eigenen Sätze – füge hinzu, wie du es sagen würdest.")]),
+      el("div", { class: "form-row" }, el("label", { class: "field grow" }, "Neuer Satz", input),
+        el("button", { type: "button", class: "btn primary", onclick: add }, icon("i-new"), "Lernen")),
+      el("details", { class: "log-box" }, el("summary", {}, `${d.examples.length} eingebaute Beispiele ansehen`),
+        el("ul", { class: "rows compact" }, d.examples.map((t) => el("li", {}, t)))),
+      el("menu", { class: "sheet-actions" }, el("button", { class: "btn", value: "close" }, "Fertig")));
+  };
+  try { await draw(); } catch (e) { toast(e.message); return; }
+  $("pair-dialog").showModal();
+  $("pair-dialog").addEventListener("close", () => { if (S.page === "router") loadRouter(); }, { once: true });
 }
 
 async function loadRouterLog(reset = false) {
@@ -528,9 +644,13 @@ async function loadMemory() {
 
 // ---------------------------------------------------------------- Skripte
 async function loadScripts() {
-  const scripts = await api("/api/admin/scripts");
+  const [scripts, files] = await Promise.all([api("/api/admin/scripts"), api("/api/admin/script-files").catch(() => ({ errors: [] }))]);
+  S.scripts = scripts;
+  $("sc-errors").replaceChildren(...(files.errors || []).map((e) => el("li", { class: "warn" }, el("span", { class: "ic" }, icon("i-warn")),
+    el("span", { class: "main" }, el("b", {}, e), el("small", {}, "Dieser Eintrag ist abgeschaltet – Pfad oder Angaben bitte neu speichern.")))));
+  $("sc-errors").hidden = !(files.errors || []).length;
   if (!scripts.length) {
-    $("sc-list").replaceChildren(el("section", { class: "panel" }, el("p", { class: "muted" }, "Keine Skripte freigegeben. Trage sie in /config/scripts.yaml ein und lies sie unter „System“ neu ein.")));
+    $("sc-list").replaceChildren(el("section", { class: "panel" }, el("p", { class: "muted" }, "Noch keine Skripte freigegeben. Lege die Datei in den Skript-Ordner und gib sie mit „Skript freigeben“ frei.")));
     return;
   }
   $("sc-list").replaceChildren(...scripts.map((s) => {
@@ -559,9 +679,108 @@ async function loadScripts() {
       } catch (err) { out.textContent = `Fehler: ${err.message}`; }
     });
     return el("section", { class: "panel" },
-      el("header", {}, el("h2", {}, icon("i-terminal"), s.id), el("span", {}, s.confirm ? st("warn", "MIT RÜCKFRAGE") : null, s.car_allowed ? st("ok", "IM AUTO") : null)),
-      el("p", { class: "small" }, s.description || "–"), el("p", { class: "muted small" }, `Zeitlimit ${s.timeout} s`), form, el("div", { class: "log-box" }, out));
+      el("header", {}, el("h2", {}, icon("i-terminal"), s.id), el("span", { class: "btn-row" }, s.confirm ? st("warn", "MIT RÜCKFRAGE") : null, s.car_allowed ? st("ok", "IM AUTO") : null)),
+      el("p", { class: "small" }, s.description || "–"), el("p", { class: "muted small" }, `${s.path} · Zeitlimit ${s.timeout} s`), form, el("div", { class: "log-box" }, out),
+      el("div", { class: "actions" },
+        el("button", { class: "btn small", onclick: () => scriptDialog(s) }, icon("i-edit"), "Bearbeiten"),
+        el("button", {
+          class: "btn small ghost", onclick: async () => {
+            if (!await confirmDialog("Freigabe entfernen?", `Jarvis darf ${s.id} danach nicht mehr ausführen. Die Datei selbst bleibt liegen.`, "Entfernen")) return;
+            try { await api(`/api/admin/scripts/${encodeURIComponent(s.id)}`, { method: "DELETE" }); toast(`${s.id} entfernt`); loadScripts(); } catch (e) { toast(e.message); }
+          },
+        }, icon("i-trash"), "Entfernen")));
   }));
+}
+
+const PARAM_TYPES = [["str", "Text"], ["int", "Zahl"], ["bool", "Ja/Nein"], ["enum", "Auswahl"]];
+
+async function scriptDialog(s = null) {
+  let info = { root: "/scripts", files: [] };
+  try { info = await api("/api/admin/script-files"); } catch { /* Liste ist nur eine Hilfe */ }
+  const body = $("pair-body");
+  const id = el("input", { class: "input", value: s?.id || "", maxlength: 40, placeholder: "z. B. backup_appdata", readonly: !!s, spellcheck: "false" });
+  const path = el("input", { class: "input", value: s?.path || "", list: "sc-files", placeholder: `${info.root}/mein_skript.sh`, spellcheck: "false" });
+  const pathHint = el("small", { class: "muted" });
+  const checkPath = () => {
+    const f = info.files.find((x) => x.path === path.value.trim());
+    pathHint.textContent = !path.value.trim() ? `Dateien liegen im Ordner ${info.root} (Unraid: appdata/mini-jarvis/scripts).`
+      : f ? (f.executable ? "Datei gefunden und ausführbar." : "Datei ist nicht ausführbar – einmal „chmod +x“ ausführen.")
+        : info.files.length ? "Datei nicht gefunden." : "";
+  };
+  path.addEventListener("input", checkPath); checkPath();
+  const desc = el("input", { class: "input", value: s?.description || "", maxlength: 300, placeholder: "Was das Skript tut – Jarvis liest das vor der Ausführung" });
+  const confirm = el("input", { type: "checkbox", checked: s ? s.confirm : true });
+  const car = el("input", { type: "checkbox", checked: s ? s.car_allowed : false });
+  const timeout = el("input", { class: "input", type: "number", min: 1, max: 3600, value: s?.timeout ?? 60 });
+  const params = Object.entries(s?.params || {}).map(([name, p]) => ({ name, ...p, choices: [...(p.choices || [])] }));
+  const box = el("div", { class: "obj-list" });
+  const drawParams = () => {
+    box.replaceChildren(...params.map((p, i) => {
+      const name = el("input", { class: "input", value: p.name, placeholder: "name", spellcheck: "false", "aria-label": "Name des Parameters" });
+      name.addEventListener("input", () => { p.name = name.value.trim(); });
+      const type = el("select", { class: "input", "aria-label": "Typ" }, PARAM_TYPES.map(([v, l]) => el("option", { value: v, selected: p.type === v }, l)));
+      type.addEventListener("change", () => { p.type = type.value; drawParams(); });
+      const req = el("input", { type: "checkbox", checked: !!p.required });
+      req.addEventListener("change", () => { p.required = req.checked; });
+      const extra = [];
+      if (p.type === "str") {
+        const pat = el("input", { class: "input", value: p.pattern || "", placeholder: "Muster (Regex), z. B. ^[a-z]{1,20}$", spellcheck: "false" });
+        pat.addEventListener("input", () => { p.pattern = pat.value; });
+        extra.push(pat);
+      } else if (p.type === "int") {
+        const min = el("input", { class: "input", type: "number", value: p.min ?? "", placeholder: "min" });
+        const max = el("input", { class: "input", type: "number", value: p.max ?? "", placeholder: "max" });
+        min.addEventListener("input", () => { p.min = min.value === "" ? null : Number(min.value); });
+        max.addEventListener("input", () => { p.max = max.value === "" ? null : Number(max.value); });
+        extra.push(min, max);
+      } else if (p.type === "enum") {
+        const ch = el("input", { class: "input", value: p.choices.join(", "), placeholder: "Werte, durch Komma getrennt" });
+        ch.addEventListener("input", () => { p.choices = ch.value.split(",").map((x) => x.trim()).filter(Boolean); });
+        extra.push(ch);
+      }
+      return el("div", { class: "obj param" },
+        el("div", { class: "param-head" }, name, type,
+          el("label", { class: "check" }, req, el("span", {}, "Pflicht")),
+          el("button", { type: "button", class: "icon-btn", "aria-label": "Parameter entfernen", onclick: () => { params.splice(i, 1); drawParams(); } }, icon("i-trash"))),
+        extra.length ? el("div", { class: "param-extra" }, extra) : null);
+    }), el("button", { type: "button", class: "btn small ghost", onclick: () => { params.push({ name: "", type: "str", required: false, choices: [] }); drawParams(); } }, icon("i-new"), "Parameter"));
+  };
+  drawParams();
+  const err = el("p", { class: "form-error", role: "alert", hidden: true });
+  const save = el("button", { type: "button", class: "btn primary" }, icon("i-check"), "Speichern");
+  save.addEventListener("click", async () => {
+    const sid = id.value.trim();
+    const spec = {
+      path: path.value.trim(), description: desc.value.trim(), confirm: confirm.checked, car_allowed: car.checked,
+      timeout: Number(timeout.value) || 60,
+      params: Object.fromEntries(params.filter((p) => p.name).map((p) => [p.name, {
+        type: p.type, required: !!p.required, pattern: p.type === "str" ? p.pattern || null : null,
+        min: p.type === "int" ? p.min ?? null : null, max: p.type === "int" ? p.max ?? null : null, choices: p.type === "enum" ? p.choices : [],
+      }])),
+    };
+    save.disabled = true;
+    try {
+      await api(`/api/admin/scripts/${encodeURIComponent(sid)}`, { method: "PUT", body: spec });
+      $("pair-dialog").close();
+      toast(`${sid} gespeichert – sofort verfügbar.`);
+      loadScripts();
+    } catch (e) { err.hidden = false; err.textContent = e.message; }
+    save.disabled = false;
+  });
+  body.replaceChildren(
+    el("h2", {}, s ? `Skript „${s.id}“` : "Skript freigeben"),
+    el("label", { class: "field" }, "Name (so ruft Jarvis es auf)", id),
+    el("label", { class: "field" }, "Datei", path, pathHint),
+    el("datalist", { id: "sc-files" }, info.files.map((f) => el("option", { value: f.path }))),
+    el("label", { class: "field" }, "Beschreibung", desc),
+    el("label", { class: "switch" }, confirm, el("span", {}, "Vorher nachfragen", el("small", {}, "Jarvis fragt vor jeder Ausführung „Soll ich …?“."))),
+    el("label", { class: "switch" }, car, el("span", {}, "Auch im Auto erlaubt", el("small", {}, "Über Android Auto ausführbar."))),
+    el("label", { class: "field" }, "Zeitlimit (Sekunden)", timeout),
+    el("h3", { class: "sub-h" }, "Parameter"),
+    el("p", { class: "muted small" }, "Angaben, die Jarvis dem Skript mitgeben darf – geprüft, bevor das Skript startet."),
+    box, err,
+    el("menu", { class: "sheet-actions" }, el("button", { class: "btn ghost", value: "cancel", formnovalidate: true }, "Abbrechen"), save));
+  $("pair-dialog").showModal();
 }
 
 // ---------------------------------------------------------------- Timer
@@ -622,14 +841,30 @@ function formatValue(v) {
 }
 
 async function loadSystem() {
-  const data = await api("/api/admin/config");
-  $("sys-secrets").replaceChildren(...(data.secrets.length ? data.secrets.map((s) => el("span", { class: "chip-s" }, icon("i-key"), s)) : [el("span", { class: "muted small" }, "Keine weiteren Geheimnisse gesetzt.")]));
+  const data = await api("/api/admin/settings");
   const general = {};
   const sections = [];
-  for (const [k, v] of Object.entries(data.config)) {
+  for (const [k, v] of Object.entries(data.values)) {
     if (v && typeof v === "object") sections.push([k, v]); else general[k] = v;
   }
   $("sys-config").replaceChildren(configNode("allgemein", general), ...sections.map(([k, v]) => configNode(k, v)));
+  $("sys-token").disabled = !!data.env.admin_token || !!data.readonly;
+  $("sys-token-note").textContent = data.env.admin_token ? "Der Token kommt aus JARVIS_ADMIN_TOKEN (Container-Vorlage) und lässt sich nur dort ändern."
+    : data.readonly || "";
+}
+
+async function rotateToken() {
+  if (!await confirmDialog("Neuen Admin-Token erzeugen?", "Der alte Token gilt sofort nicht mehr. Andere angemeldete Browser müssen sich neu anmelden.", "Erzeugen")) return;
+  let r;
+  try { r = await api("/api/admin/token/rotate", { method: "POST" }); } catch (e) { toast(e.message); return; }
+  const remember = (() => { try { return !!localStorage.getItem(TOKEN_KEY); } catch { return false; } })();
+  S.token = r.token;
+  saveToken(r.token, remember);
+  $("pair-body").replaceChildren(el("h2", {}, "Neuer Admin-Token"),
+    el("p", {}, "Dieser Browser ist schon umgestellt. Bewahre den Token gut auf – er wird nur jetzt angezeigt."),
+    el("div", { class: "secret" }, el("span", {}, r.token), el("button", { type: "button", class: "btn small", onclick: () => copy(r.token) }, "Kopieren")),
+    el("menu", { class: "sheet-actions" }, el("button", { class: "btn", value: "close" }, "Fertig")));
+  $("pair-dialog").showModal();
 }
 
 // ---------------------------------------------------------------- Ereignisse
@@ -673,9 +908,12 @@ function bind() {
   $("sys-reload").addEventListener("click", async () => {
     try {
       const r = await api("/api/admin/reload", { method: "POST" });
-      $("sys-reload-out").textContent = `Neu eingelesen: ${r.intents} Absichten. ${r.hint}`;
+      $("sys-reload-out").textContent = `Neu eingelesen: ${r.intents} Absichten, Skripte und Container-Freigaben.`;
     } catch (err) { $("sys-reload-out").textContent = err.message; }
   });
+  $("sys-restart").addEventListener("click", restartJarvis);
+  $("sys-token").addEventListener("click", rotateToken);
+  $("sc-new").addEventListener("click", () => scriptDialog());
   $("fw-upload").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = new FormData();
@@ -694,6 +932,7 @@ function bind() {
 
 applyTheme(S.theme);
 bind();
+initSettings({ api, onSaved: setRestart });
 const saved = readToken();
 if (saved) {
   login(saved, (() => { try { return !!localStorage.getItem(TOKEN_KEY); } catch { return false; } })()).catch(() => logout());

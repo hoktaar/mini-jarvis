@@ -304,8 +304,7 @@ function renderHome(home) {
     tag.hidden = true;
     box.replaceChildren(el("div", { class: "empty-state" },
       el("span", {}, "Verbinde Home Assistant, um Licht, Heizung und mehr hier zu steuern."),
-      el("code", {}, "config.yaml → homeassistant: enabled, url, entities"),
-      el("a", { href: "admin.html#system" }, "Zur Verwaltung")));
+      el("a", { class: "btn small", href: "admin.html#settings:home" }, "In der Verwaltung einrichten")));
     return;
   }
   const available = home.tiles.filter((t) => t.available).length;

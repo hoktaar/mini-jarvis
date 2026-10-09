@@ -46,4 +46,21 @@ curl -fs -H "$H" "http://127.0.0.1:$PORT/api/admin/overview" | grep -q '"version
 curl -fs -H "$H" -H "Content-Type: application/json" -d '{"args": {"name": "Rauchtest"}}' \
   "http://127.0.0.1:$PORT/api/admin/scripts/say_hello/run" | grep -q "Rauchtest" || fail "Skript-Runner"
 curl -fs -H "$H" "http://127.0.0.1:$PORT/api/admin/firmware" | grep -q '"cyd"' || fail "eingebaute Firmware fehlt"
+
+# Einstellungen aus der Verwaltung: Schreibrechte auf /config und Neustart im Container
+boot() { curl -fs "http://127.0.0.1:$PORT/api/health" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["boot"])' 2>/dev/null; }
+BOOT=$(boot)
+curl -fs -X PUT -H "$H" -H "Content-Type: application/json" -d '{"changes": {"location.name": "Rauchtest"}}' \
+  "http://127.0.0.1:$PORT/api/admin/settings" | grep -q '"core":true' || fail "Einstellungen speichern"
+docker exec $NAME grep -q "Rauchtest" /config/config.yaml || fail "config.yaml nicht geschrieben"
+curl -fs -X POST -H "$H" "http://127.0.0.1:$PORT/api/admin/restart" >/dev/null || fail "Neustart anstoßen"
+i=0
+while :; do
+  b=$(boot)
+  [ -n "$b" ] && [ "$b" != "$BOOT" ] && break
+  i=$((i + 1)); [ $i -gt 60 ] && fail "Jarvis kommt nach dem Neustart nicht zurück"
+  sleep 2
+done
+curl -fs -H "$H" "http://127.0.0.1:$PORT/api/admin/settings" | grep -q '"name":"Rauchtest"' || fail "Einstellung nach Neustart"
+echo "Einstellungen und Neustart ok"
 echo "Rauchtest bestanden"
