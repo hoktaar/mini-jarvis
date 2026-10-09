@@ -34,6 +34,7 @@ from jarvis.router.router import Route
 WEB_DIR = Path(__file__).parent / "web"
 services = None
 _failed_admin: dict[str, list[float]] = {}
+_failed_api: dict[str, list[float]] = {}
 _servers: list = []                 # laufende uvicorn-Server (für den Neustart aus der Verwaltung)
 _restart = False
 
@@ -73,7 +74,7 @@ app = FastAPI(title="Mini-Jarvis", version=__version__, lifespan=lifespan)
 @app.middleware("http")
 async def _starting(request: Request, call_next):
     # Der HTTPS-Server nimmt schon Anfragen an, während der erste Server die Dienste aufbaut.
-    if services is None and request.url.path.startswith("/api/"):
+    if services is None and request.url.path.startswith(("/api/", "/v1/")):
         return JSONResponse({"detail": "Jarvis startet noch …"}, status_code=503)
     return await call_next(request)
 
@@ -388,6 +389,102 @@ async def firmware_file(variant: str, name: str, authorization: str = Header(def
     return FileResponse(path, media_type="application/octet-stream")
 
 
+# --------------------------------------------------------------------------- Transkriptions-Schnittstelle
+# Wie OpenAI (/v1/audio/transcriptions): Diktier-Apps und andere Geräte im Heimnetz nutzen Jarvis'
+# Spracherkennung mit. Aus, bis sie in der Verwaltung eingeschaltet wird.
+TRANSCRIPTION_TOKEN = "transcription_api_token"
+TRANSCRIPTION_MAX_BYTES = 25 * 1024 * 1024
+
+
+def _oa_error(status: int, message: str, kind: str = "invalid_request_error") -> JSONResponse:
+    return JSONResponse({"error": {"message": message, "type": kind}}, status_code=status)
+
+
+def _transcription_token() -> str:
+    from jarvis.settings import env_secret
+
+    return env_secret(TRANSCRIPTION_TOKEN) or services.secrets.get(TRANSCRIPTION_TOKEN, "")
+
+
+def _transcription_engine() -> str:
+    from jarvis.providers import LOCAL_TRANSCRIBE, REMOTE_TRANSCRIBE
+
+    t = services.cfg.providers.stt.type
+    return t if t in (*LOCAL_TRANSCRIBE, *REMOTE_TRANSCRIBE) else ""
+
+
+async def _transcription_auth(request: Request, authorization: str) -> JSONResponse | None:
+    if not services.cfg.server.transcription_api:
+        return _oa_error(404, "Transkriptions-Schnittstelle ist aus (Verwaltung → Einstellungen → Sprache).")
+    ip = _client_ip(request)
+    token = _bearer(authorization)
+    expected = _transcription_token()
+    ok = bool(token) and ((bool(expected) and hmac.compare_digest(token, expected))
+                          or services.devices.verify(token) is not None)
+    if not ok:
+        recent = [t for t in _failed_api.get(ip, []) if t > time.time() - 300] + [time.time()]
+        _failed_api[ip] = recent
+        await asyncio.sleep(min(5.0, 0.5 * len(recent)))
+        return _oa_error(401, "Token fehlt oder ist falsch.", "authentication_error")
+    _failed_api.pop(ip, None)
+    return None
+
+
+@app.get("/v1/models")
+async def v1_models(request: Request, authorization: str = Header(default="")):
+    if (err := await _transcription_auth(request, authorization)) is not None:
+        return err
+    engine = _transcription_engine()
+    return {"object": "list", "data": [{"id": engine, "object": "model", "owned_by": "mini-jarvis"}] if engine else []}
+
+
+@app.post("/v1/audio/transcriptions")
+async def v1_transcriptions(request: Request, file: UploadFile = File(...), model: str = Form(""),
+                            language: str = Form(""), response_format: str = Form("json"),
+                            authorization: str = Header(default="")):
+    from jarvis import providers
+
+    if (err := await _transcription_auth(request, authorization)) is not None:
+        return err
+    if not _transcription_engine():
+        return _oa_error(409, "Die eingestellte Spracherkennung kann keine Dateien umwandeln – "
+                              "bitte Parakeet, Whisper, OpenAI oder Groq wählen.")
+    if response_format not in ("json", "text", "verbose_json"):
+        return _oa_error(400, "response_format: nur json, text oder verbose_json.")
+    if language and language.split("-")[0].lower() != "de":
+        return _oa_error(400, "Jarvis erkennt nur Deutsch (language=de).")
+    data = await file.read(TRANSCRIPTION_MAX_BYTES + 1)
+    if len(data) > TRANSCRIPTION_MAX_BYTES:
+        return _oa_error(413, "Datei zu groß (höchstens 25 MB).")
+    if not data:
+        return _oa_error(400, "Leere Datei.")
+    cfg = services.cfg
+    started = time.monotonic()
+    duration = 0.0
+    try:
+        if _transcription_engine() in providers.REMOTE_TRANSCRIBE:
+            text = await providers.transcribe_audio(cfg, services.secrets, data, file.filename or "audio.wav")
+        else:
+            audio = await asyncio.to_thread(providers.decode_audio, data)
+            duration = len(audio) / 16000
+            text = await asyncio.to_thread(providers.transcribe_float, cfg, audio)
+    except providers.AudioFormatError as e:
+        return _oa_error(400, str(e))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Transkription fehlgeschlagen: {type(e).__name__}: {e}")
+        return _oa_error(500, f"Spracherkennung fehlgeschlagen: {type(e).__name__}", "server_error")
+    # Kein Transkript ins Log – nur Länge und Dauer
+    logger.info(f"Transkription über die Schnittstelle: {duration:.1f} s Audio, {len(text)} Zeichen, "
+                f"{time.monotonic() - started:.2f} s")
+    if response_format == "text":
+        from fastapi.responses import PlainTextResponse
+
+        return PlainTextResponse(text)
+    if response_format == "verbose_json":
+        return {"task": "transcribe", "language": "german", "duration": round(duration, 2), "text": text, "segments": []}
+    return {"text": text}
+
+
 # --------------------------------------------------------------------------- Verwaltung
 admin = [Depends(require_admin)]
 
@@ -401,6 +498,7 @@ def _device_row(d: dict) -> dict:
 
 @app.get("/api/admin/overview", dependencies=admin)
 async def overview(request: Request):
+    from jarvis import providers
     from jarvis.tls import cert_info
 
     cfg = services.cfg
@@ -411,12 +509,14 @@ async def overview(request: Request):
                  "transport": "voice" if s.voice else "chat"} for s in services.online()]
     return {
         "version": __version__, "uptime_s": int(time.time() - services.started), "timezone": cfg.location.timezone,
-        "warnings": services.warnings, "sessions": sessions, "checks": reachable,
+        "warnings": services.warnings + ([providers.whisper_gpu_problem] if providers.whisper_gpu_problem else []),
+        "sessions": sessions, "checks": reachable,
         "providers": {
             "llm_primary": p.llm.primary,
             "llm_local": f"{p.llm.local.model} (Ollama)" if p.llm.local.enabled else "aus",
             "llm_cloud": f"{p.llm.cloud.type}: {p.llm.cloud.model}" if p.llm.cloud.enabled else "aus",
-            "stt": "aus" if p.stt.type == "none" else f"{p.stt.type} {p.stt.model}".strip(),
+            "stt": "aus" if p.stt.type == "none" else "parakeet (CPU)" if p.stt.type == "parakeet"
+            else f"{p.stt.type} {p.stt.model}".strip(),
             "tts": "aus" if p.tts.type == "none" else f"{p.tts.type} {p.tts.voice}".strip(),
             "search": cfg.search.provider, "cloud_services": cloud_services(cfg),
         },
@@ -733,7 +833,7 @@ def _reload_runtime() -> None:
 
 
 # Einstellungen, die sofort wirken (alles andere braucht einen Neustart von Jarvis)
-LIVE_PATHS = {"firmware.auto_update", "privacy.retention_days"}
+LIVE_PATHS = {"firmware.auto_update", "privacy.retention_days", "server.transcription_api"}
 
 
 @app.get("/api/admin/settings", dependencies=admin)
@@ -793,6 +893,7 @@ async def settings_put(body: SettingsIn):
         services.cfg.firmware.auto_update = cfg.firmware.auto_update
         services.cfg.privacy.retention_days = cfg.privacy.retention_days
         services.firmware.auto_update = cfg.firmware.auto_update
+        services.cfg.server.transcription_api = cfg.server.transcription_api
     elif body.changes or body.secrets:
         services.restart_pending["core"] = True
     services.restart_pending["container"] = st.container_restart_reasons(cfg)
@@ -998,6 +1099,72 @@ async def ollama_pull(body: PullIn):
 async def ollama_pull_status():
     state = services.ollama_pull or {}
     return {k: v for k, v in state.items() if not k.startswith("_")}
+
+
+# ---- Parakeet-Modell und Transkriptions-Schnittstelle
+@app.get("/api/admin/parakeet", dependencies=admin)
+async def parakeet_status():
+    from jarvis import parakeet
+
+    return parakeet.status()
+
+
+@app.post("/api/admin/parakeet/download", dependencies=admin)
+async def parakeet_download():
+    from jarvis import parakeet
+
+    if not parakeet.installed() and not parakeet.state["downloading"]:
+        parakeet.state.update(downloading=True, error="")      # sofort sichtbar, bevor der Thread läuft
+
+        def run() -> None:
+            try:
+                parakeet.download()
+                services.feed.add("Parakeet-Modell geladen", "ok", "system")
+            except Exception as e:  # noqa: BLE001
+                logger.warning(str(e))
+
+        asyncio.get_running_loop().run_in_executor(None, run)
+        services.db.audit("admin", "parakeet_download", parakeet.MODEL_REPO)
+    return parakeet.status()
+
+
+def _transcription_info() -> dict:
+    from jarvis.settings import env_secret
+
+    return {"enabled": services.cfg.server.transcription_api, "token": _transcription_token(),
+            "token_env": bool(env_secret(TRANSCRIPTION_TOKEN)), "engine": _transcription_engine(),
+            "path": "/v1/audio/transcriptions"}
+
+
+@app.get("/api/admin/transcription", dependencies=admin)
+async def transcription_info():
+    return _transcription_info()
+
+
+@app.post("/api/admin/transcription/token", dependencies=admin)
+async def transcription_token():
+    import secrets as pysecrets
+
+    from ruamel.yaml.scalarstring import DoubleQuotedScalarString
+
+    from jarvis import settings as st
+
+    if st.env_secret(TRANSCRIPTION_TOKEN):
+        raise HTTPException(409, "Der Token kommt aus JARVIS_TRANSCRIPTION_API_TOKEN (Container-Vorlage) "
+                                 "und lässt sich nur dort ändern.")
+    files = _files()
+    token = "jt_" + pysecrets.token_urlsafe(24)
+    try:
+        if reason := files.readonly_reason():
+            raise st.SettingsError(reason, status=409)
+        raw = files.load("secrets.yaml")
+        raw[TRANSCRIPTION_TOKEN] = DoubleQuotedScalarString(token)
+        files.save("secrets.yaml", raw)
+    except st.SettingsError as e:
+        raise _settings_http(e) from e
+    services.secrets[TRANSCRIPTION_TOKEN] = token
+    services.db.audit("admin", "transcription_token", "neu erzeugt")
+    return _transcription_info()
 
 
 # ---- Home Assistant: Verbindung testen und Entitäten zur Auswahl laden

@@ -12,6 +12,7 @@ server:
     certfile: ""          # eigenes Zertifikat (z. B. Let's Encrypt) – sonst eigene CA unter /data/tls
     keyfile: ""
   public_url: ""          # z. B. https://jarvis.lan:8443 – für Pairing-Links/QR-Codes
+  transcription_api: false  # /v1/audio/transcriptions wie OpenAI – für Diktier-Apps im Heimnetz
 
 language: de
 location:                 # Standard für Wetter, Zeitzone für Wecker und Erinnerungen
@@ -46,10 +47,11 @@ audio:
 # ---------------------------------------------------------------------------
 providers:
   stt:                    # Spracherkennung
-    type: whisper         # whisper (lokal) | openai | groq | deepgram | azure | google | elevenlabs | none
+    type: whisper         # whisper (lokal) | parakeet (lokal, CPU) | openai | groq | deepgram | azure | google | elevenlabs | none
     model: large-v3-turbo # whisper: large-v3-turbo · openai: gpt-4o-transcribe · groq: whisper-large-v3-turbo · deepgram: nova-3
     device: cuda          # nur whisper: cuda | cpu
     compute_type: int8_float16
+    threads: 4            # nur parakeet: CPU-Threads
     base_url: ""          # openai: auch eigener kompatibler Endpunkt möglich
     region: ""            # azure
   tts:                    # Sprachausgabe

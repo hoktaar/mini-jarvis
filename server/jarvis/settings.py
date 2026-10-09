@@ -55,6 +55,9 @@ SECRET_LABELS = {
     "telegram_bot_token": "Telegram-Bot", "matrix_password": "Matrix-Passwort", "typesafe_api_key": "Jev (Klassifikator)",
 }
 
+# Haben eigene Knöpfe zum Neu-Erzeugen und erscheinen nicht in der Schlüssel-Liste
+OWN_PAGE_SECRETS = {"admin_token", "transcription_api_token"}
+
 # Was eine Änderung braucht, die über einen Neustart von Jarvis hinausgeht (supervisord-Umgebung)
 CONTAINER_ENV = {
     "JARVIS_OLLAMA_AUTOSTART": "eingebautes Ollama an/aus",
@@ -487,7 +490,7 @@ def env_secret(name: str) -> str:
 
 def secret_status(files: ConfigFiles) -> dict[str, dict]:
     data = files.load("secrets.yaml")
-    names = (set(SECRET_LABELS) | {str(k) for k in data}) - {"admin_token"}
+    names = (set(SECRET_LABELS) | {str(k) for k in data}) - OWN_PAGE_SECRETS
     out = {}
     for name in sorted(names):
         source = "env" if env_secret(name) else "file" if data.get(name) not in (None, "") else None
@@ -499,6 +502,8 @@ def apply_secrets(raw: CommentedMap, updates: dict[str, str | None]) -> None:
     for name, value in updates.items():
         if name == "admin_token":
             raise SettingsError("Den Admin-Token bitte unter „System“ neu erzeugen.")
+        if name == "transcription_api_token":
+            raise SettingsError("Den Token der Transkriptions-Schnittstelle bitte unter „Sprache“ neu erzeugen.")
         if not SECRET_RE.match(name):
             raise SettingsError(f"Ungültiger Name für ein Geheimnis: {name}")
         if env_secret(name):

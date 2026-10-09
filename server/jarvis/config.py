@@ -45,6 +45,8 @@ class ServerCfg(_Cfg):
     port: int = 8080
     https: HttpsCfg = HttpsCfg()
     public_url: str = ""          # z. B. https://jarvis.lan:8443 – für Pairing-Links
+    # /v1/audio/transcriptions wie bei OpenAI – für Diktier-Apps und andere Geräte im Heimnetz
+    transcription_api: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -93,10 +95,10 @@ class AudioCfg(_Cfg):
     wake_word: WakeWordCfg = WakeWordCfg()
 
 
-STT_TYPES = ("whisper", "openai", "groq", "deepgram", "azure", "google", "elevenlabs", "none")
+STT_TYPES = ("whisper", "parakeet", "openai", "groq", "deepgram", "azure", "google", "elevenlabs", "none")
 TTS_TYPES = ("piper", "openai", "elevenlabs", "cartesia", "deepgram", "azure", "google", "none")
 CLOUD_LLM_TYPES = ("anthropic", "openai", "google", "mistral", "groq", "openrouter", "deepseek", "openai_compatible")
-LOCAL_STT, LOCAL_TTS = {"whisper", "none"}, {"piper", "none"}
+LOCAL_STT, LOCAL_TTS = {"whisper", "parakeet", "none"}, {"piper", "none"}
 
 
 class SttCfg(_Cfg):
@@ -104,6 +106,7 @@ class SttCfg(_Cfg):
     model: str = "large-v3-turbo"     # whisper: large-v3-turbo · openai: gpt-4o-transcribe · groq: whisper-large-v3-turbo · deepgram: nova-3
     device: str = "cuda"              # nur whisper
     compute_type: str = "int8_float16"
+    threads: int = 4                  # nur parakeet: CPU-Threads (4 reicht meist, mehr bremst den Rest)
     base_url: str = ""                # openai: eigener/kompatibler Endpunkt
     region: str = ""                  # azure
     api_key_secret: str = ""          # abweichender Name in secrets.yaml
