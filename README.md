@@ -4,6 +4,19 @@
 [![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-blue.svg)](LICENSE)
 [![Unraid](https://img.shields.io/badge/Unraid-Template-orange.svg)](docs/UNRAID.md)
 [![Image](https://img.shields.io/badge/ghcr.io-mini--jarvis-2496ED.svg)](https://github.com/hoktaar/mini-jarvis/pkgs/container/mini-jarvis)
+[![Status: Work in Progress](https://img.shields.io/badge/Status-Work%20in%20Progress-orange.svg)](#stand-und-roadmap)
+
+> [!WARNING]
+> **Work in Progress.** Mini-Jarvis ist ein Hobbyprojekt in aktiver Entwicklung – kein fertiges Produkt.
+> Vieles läuft schon, manches ist nur im Test und mit simulierten Geräten geprüft (u. a. die CYD-Firmware auf
+> echter Hardware und die lokalen Modelle auf der GPU). Einstellungen, Schnittstellen und Firmware können sich
+> zwischen Versionen ändern, Fehler sind zu erwarten.
+>
+> - Nicht für sicherheitskritische Steuerungen verwenden (Schlösser, Alarmanlagen, Heizung ohne Rückfallebene).
+> - Jarvis nicht ungeschützt ins Internet stellen – Zugriff von außen nur über VPN.
+> - Vor Updates die Einstellungen sichern (Ordner `appdata/mini-jarvis/config`).
+>
+> Rückmeldungen und Fehlerberichte sind willkommen: [Issues](https://github.com/hoktaar/mini-jarvis/issues).
 
 **Dein eigener, deutschsprachiger Sprachassistent – auf deinem Server, lokal als Standard, Cloud nur wenn du willst.**
 Ein Container für Unraid oder Docker, dazu kleine Touch-Displays (CYD/ESP32) für jeden Raum, eine App fürs Handy
@@ -42,7 +55,7 @@ Ein Container für Unraid oder Docker, dazu kleine Touch-Displays (CYD/ESP32) f�
 | 🔊 **Stimme** | Spracherkennung: Whisper, OpenAI, Groq, Deepgram, Azure, Google, ElevenLabs · Sprachausgabe: Piper, OpenAI, ElevenLabs, Cartesia, Deepgram, Azure, Google |
 | 🔁 **Ausfallsicher** | Lokal oder Cloud als Standard, der andere Weg springt bei Fehlern ein; Budget pro Tag/Monat |
 | 🔒 **Sicher** | Rückfrage bei kritischen Aktionen, Schutz vor Prompt-Injection aus Webinhalten, Geräte-Tokens, HTTPS mit eigener CA, Privatmodus pro Gerät |
-| 🖥️ **Oberflächen** | HUD-Dashboard (Desktop, Tablet, Handy, hell/dunkel), Verwaltung, CYD-Display mit Licht- und Musikseiten |
+| 🖥️ **Oberflächen** | HUD-Dashboard (Desktop, Tablet, Handy, hell/dunkel), Verwaltung mit allen Einstellungen (ohne YAML), CYD-Display mit Licht- und Musikseiten |
 | 🔌 **Firmware** | CYD per USB direkt aus dem Browser flashen und einrichten, alle Updates danach per WLAN |
 | 💬 **Überall** | PWA fürs Handy, Telegram- und Matrix-Bot (mit Ja/Nein-Knöpfen und Sprachnachrichten), REST-API |
 
@@ -66,6 +79,8 @@ Ein Container für Unraid oder Docker, dazu kleine Touch-Displays (CYD/ESP32) f�
 
 | | |
 |---|---|
+| ![Einstellungen: Sprachmodell](docs/images/verwaltung-einstellungen.png) | ![Einstellungen: Smart Home](docs/images/verwaltung-smarthome.png) |
+| **Einstellungen** – alles per Formular, lokal oder Cloud, Modelle laden | **Smart Home** – Home Assistant testen, Geräte ankreuzen |
 | ![Übersicht](docs/images/verwaltung-uebersicht.png) | ![CYD per USB einrichten](docs/images/verwaltung-firmware.png) |
 | **Übersicht** – Dienste, KI-Anbieter, Antwortzeiten, HTTPS | **Firmware** – CYD per USB flashen und einrichten |
 | ![Geräte](docs/images/verwaltung-geraete.png) | ![Router](docs/images/verwaltung-router.png) |
@@ -101,7 +116,7 @@ Ordner an und trägt die Server-IP ein. Alles Weitere – auch der Betrieb ohne 
 ```bash
 git clone https://github.com/hoktaar/mini-jarvis.git && cd mini-jarvis
 docker compose up -d                 # ohne GPU: den deploy-Block in docker-compose.yml entfernen
-docker compose exec mini-jarvis grep admin_token /config/secrets.yaml
+docker compose logs mini-jarvis | grep -A3 "Admin-Token"     # Token für die Verwaltung (erster Start)
 ```
 
 Oder das fertige Image: `ghcr.io/hoktaar/mini-jarvis:latest`.
@@ -109,8 +124,10 @@ Oder das fertige Image: `ghcr.io/hoktaar/mini-jarvis:latest`.
 ### Danach
 
 1. `https://<server>:8443/` öffnen, Zertifikatswarnung einmal bestätigen.
-2. **Verwaltung** (`/admin.html`) mit dem Admin-Token öffnen → **CA-Zertifikat** laden und auf deinen Geräten installieren.
-3. `config/config.yaml`: Standort eintragen, Modelle wählen (lokal oder Cloud) – die Übersicht zeigt, was noch fehlt.
+2. **Verwaltung** (`/admin.html`) mit dem Admin-Token öffnen – er steht beim ersten Start im Container-Log.
+   Unter **Übersicht** das **CA-Zertifikat** laden und auf deinen Geräten installieren.
+3. **Einstellungen**: Ort suchen, Sprachmodell wählen (lokal oder Cloud), Schlüssel eintragen, Home Assistant
+   verbinden – alles per Formular, keine Datei bearbeiten. Danach **Jetzt neu starten**; die Übersicht zeigt, was noch fehlt.
 4. **Geräte → Neues Gerät**: Handy per QR-Code koppeln.
 5. **Firmware → CYD per USB einrichten**: Display anschließen, WLAN eintragen, fertig.
 
@@ -125,7 +142,7 @@ Oder das fertige Image: `ghcr.io/hoktaar/mini-jarvis:latest`.
 | **Ohne GPU** | beliebige x86-CPU, 8 GB RAM | Sprachmodell aus der Cloud oder von einem externen Ollama, Whisper „small“ auf der CPU oder Cloud-Spracherkennung, Piper |
 
 Speicherbedarf: ca. 12 GB für das Image, 8–15 GB für Modelle (am besten auf SSD/Cache-Pool).
-Die GPU lässt sich mit ComfyUI teilen (`gpu.comfyui_mode: auto`).
+Die GPU lässt sich mit ComfyUI teilen (Einstellungen → Werkzeuge → Grafikkarte teilen).
 
 ### CYD-Display (ESP32-2432S028)
 
@@ -244,47 +261,60 @@ flowchart LR
 
 ## Konfiguration
 
-Alle Dateien liegen im Volume `/config` und werden beim ersten Start aus [`config/examples`](config/examples)
-angelegt.
+Alles wird in der **Verwaltung** eingestellt – keine YAML-Datei anfassen:
+
+| Wo | Was |
+|---|---|
+| **Einstellungen → Allgemein** | Ort suchen (füllt Koordinaten und Zeitzone), Persönlichkeit, Gedächtnis |
+| **Einstellungen → Sprachmodell** | lokal (Ollama, Modelle direkt herunterladen) und/oder Cloud, Anbieter, Schlüssel, Budget |
+| **Einstellungen → Sprache** | Spracherkennung, Sprachausgabe, Aktivierungswort „Hey Jarvis“ |
+| **Einstellungen → Suche & Nachrichten** | Websuche, RSS-Quellen |
+| **Einstellungen → Smart Home** | Home Assistant verbinden, Verbindung testen, Geräte ankreuzen, Sprachsteuerung |
+| **Einstellungen → Kalender · Benachrichtigungen** | CalDAV, Push (ntfy), Telegram, Matrix |
+| **Einstellungen → Werkzeuge** | Docker-Container freigeben, Grafikkarte mit ComfyUI teilen, MCP-Server |
+| **Einstellungen → Netzwerk & Sicherheit** | HTTPS, Adressen fürs Zertifikat, Aufbewahrung der Protokolle, Firmware-Updates |
+| **Einstellungen → Schlüssel & Zugänge** | alle API-Schlüssel und Passwörter – Werte werden nie angezeigt |
+| **Skripte** | eigene Skripte freigeben, Parameter und Rückfrage festlegen |
+| **Router** | Absicht antippen → eigene Beispielsätze lernen |
+| **System** | Jarvis neu starten, Admin-Token erneuern |
+
+Jede Eingabe wird vor dem Speichern geprüft – Fehler stehen direkt am Feld. Gespeicherte Änderungen übernimmt
+Jarvis nach **Jetzt neu starten** (wenige Sekunden, Geräte verbinden sich von selbst wieder). Skripte,
+Beispielsätze und Container-Freigaben wirken sofort.
+
+**Typische Aufstellungen:**
+
+| | Sprachmodell | Spracherkennung / -ausgabe |
+|---|---|---|
+| **Alles lokal** (GPU) | Lokal zuerst, Ollama eingebaut, `qwen3:8b` | Whisper (Grafikkarte) / Piper |
+| **Ohne GPU** | Cloud zuerst (z. B. Anthropic), lokales Modell aus | Whisper „small“ auf dem Prozessor oder Cloud / Piper |
+| **Lokal mit Rückfallebene** | Lokal zuerst + Cloud-Modell „bei Ausfall einspringen“ | wie oben |
+
+| Rolle | Anbieter |
+|---|---|
+| Sprachmodell | Anthropic · OpenAI · Google · Mistral · Groq · OpenRouter · DeepSeek · OpenAI-kompatibel (eigene Adresse) |
+| Spracherkennung | Whisper (lokal) · OpenAI · Groq · Deepgram · Azure · Google · ElevenLabs |
+| Sprachausgabe | Piper (lokal) · OpenAI · ElevenLabs · Cartesia · Deepgram · Azure · Google |
+| Websuche | SearXNG (eingebaut) · Brave · Tavily |
+
+<details>
+<summary>Für Fortgeschrittene: die Dateien dahinter</summary>
+
+Die Verwaltung speichert alles im Volume `/config` (beim ersten Start aus [`config/examples`](config/examples)
+angelegt). Sie schreibt die Dateien so, dass Kommentare und Reihenfolge erhalten bleiben, und legt vor jeder
+Änderung eine Sicherung unter `/config/backups/` an (die letzten 20 je Datei).
 
 | Datei | Inhalt |
 |---|---|
-| `config.yaml` | Standort, Modelle und Anbieter, Router, Werkzeuge, MCP-Server, Home Assistant, Kalender, Push, Chat-Bots, Datenschutz |
-| `secrets.yaml` | Admin-Token (wird erzeugt), API-Schlüssel, Passwörter – oder als `JARVIS_<NAME>`-Variable |
-| `intents.yaml` | Schnellweg-Absichten mit Beispielsätzen – eigene ergänzen, ohne Neustart neu einlesbar |
-| `scripts.yaml` | freigegebene Skripte mit Parametern und Rückfrage-Regeln |
-| `whitelist.yaml` | Container, die Jarvis steuern darf |
+| `config.yaml` | alle Einstellungen der Seite „Einstellungen“ |
+| `secrets.yaml` | Admin-Token, API-Schlüssel, Passwörter – Umgebungsvariablen `JARVIS_<NAME>` haben Vorrang |
+| `scripts.yaml` | freigegebene Skripte |
+| `whitelist.yaml` | freigegebene Container |
+| `intents.yaml` | Absichten des Schnellwegs (eigene Beispielsätze speichert die Verwaltung in der Datenbank) |
 
-**Alles lokal:**
-
-```yaml
-providers:
-  stt: { type: whisper, model: large-v3-turbo }
-  tts: { type: piper, voice: de_DE-thorsten-high }
-  llm:
-    primary: local
-    local: { enabled: true, model: qwen3:8b }
-```
-
-**Cloud-Sprachmodell, Rest lokal (ohne GPU):**
-
-```yaml
-providers:
-  stt: { type: whisper, model: small, device: cpu, compute_type: int8 }
-  llm:
-    primary: cloud
-    local: { enabled: false }
-    cloud: { enabled: true, type: anthropic, model: claude-sonnet-5-5, budget_eur_day: 1.0 }
-```
-
-**Lokal zuerst, Cloud als Rückfallebene:** `primary: local` und zusätzlich `cloud.enabled: true`.
-
-| Rolle | Anbieter | Schlüssel in `secrets.yaml` |
-|---|---|---|
-| Sprachmodell | `anthropic` · `openai` · `google` · `mistral` · `groq` · `openrouter` · `deepseek` · `openai_compatible` | `<anbieter>_api_key` |
-| Spracherkennung | `whisper` · `openai` · `groq` · `deepgram` · `azure` · `google` · `elevenlabs` | `deepgram_api_key`, `azure_speech_key`, `google_credentials` … |
-| Sprachausgabe | `piper` · `openai` · `elevenlabs` · `cartesia` · `deepgram` · `azure` · `google` | `elevenlabs_api_key`, `cartesia_api_key` … |
-| Websuche | `searxng` · `brave` · `tavily` | `brave_api_key`, `tavily_api_key` |
+Wer lieber Dateien pflegt: `JARVIS_CONFIG_READONLY=true` in der Container-Vorlage sperrt das Schreiben – die
+Verwaltung zeigt die Werte dann nur an. Nach Änderungen von Hand: **System → Jarvis neu starten**.
+</details>
 
 ## Sicherheit und Datenschutz
 
@@ -292,8 +322,10 @@ providers:
   Sprachmodell und Werkzeuge lokal, das Wolken-Symbol zeigt Cloud-Antworten an.
 - **Rückfragen** – kritische Aktionen nur nach eindeutigem „Ja“; unklare Antworten führen zum Abbruch.
 - **Schutz vor Prompt-Injection** – nach Web- und Nachrichteninhalten fragt Jarvis vor jeder schreibenden Aktion.
-- **Rechtetrennung** – Skripte laufen als eigener Benutzer ohne Shell; Docker nur über einen Filter-Proxy mit
-  Whitelist; die Konfiguration ist für den Jarvis-Prozess schreibgeschützt.
+- **Rechtetrennung** – Skripte laufen als eigener Benutzer ohne Shell und nur, wenn sie freigegeben sind; Docker nur
+  über einen Filter-Proxy, der höchstens Status, Start, Stopp und Neustart erlaubt.
+- **Einstellungen** – nur mit Admin-Token, jede Änderung geprüft, protokolliert und vorher gesichert; Schlüssel
+  verlassen den Server nie. Wer Dateien bevorzugt, sperrt die Verwaltung mit `JARVIS_CONFIG_READONLY=true`.
 - **Geräte** – eigenes Token pro Gerät (nur als Hash gespeichert), jederzeit sperrbar; HTTPS mit eigener CA.
 - **Protokolle** – Router- und Aktionsprotokoll mit Aufbewahrungsfrist; Sätze auf Wunsch gar nicht speichern.
 
@@ -331,14 +363,20 @@ scripts/       Beispiel-Skripte für den Runner
 ```
 
 Die CI prüft Lint, Tests, Router-Trefferquote, baut beide Firmware-Varianten, rendert die Bildschirme, baut
-das Image, startet es ohne GPU im Rauchtest und veröffentlicht es unter `ghcr.io/hoktaar/mini-jarvis`.
+das Image, startet es ohne GPU im Rauchtest (inklusive Speichern einer Einstellung und Neustart) und
+veröffentlicht es unter `ghcr.io/hoktaar/mini-jarvis`.
 
 ## Stand und Roadmap
 
+> [!NOTE]
+> **Work in Progress** – die Tabelle zeigt ehrlich, was wie weit geprüft ist. ✅ heißt: automatisch getestet
+> und im Browser oder Container ausprobiert, nicht „jahrelang im Alltag bewährt“.
+
 | Teil | Stand |
 |---|---|
-| Server: Sprachweg, Router, Werkzeuge, Policy, Runner, Timer, Gedächtnis, Kalender, Home Assistant, Cloud-Anbieter, Telegram/Matrix | ✅ 89 Tests, Router 92,7 % auf dem Testsatz |
+| Server: Sprachweg, Router, Werkzeuge, Policy, Runner, Timer, Gedächtnis, Kalender, Home Assistant, Cloud-Anbieter, Telegram/Matrix | ✅ 107 Tests, Router 92,7 % auf dem Testsatz |
 | Dashboard und Verwaltung | ✅ im Browser getestet (Desktop, Tablet, Handy, hell/dunkel) |
+| Einstellungen ohne YAML (inkl. Neustart aus der Verwaltung) | ✅ im Browser und im Container-Rauchtest geprüft |
 | USB-Einrichtung aus dem Browser | ✅ Ablauf mit simuliertem Gerät getestet; Flashen braucht echte Hardware |
 | CYD-Firmware 0.3.0 | 🟡 kompiliert (beide Varianten), Bildschirme geprüft – **auf Hardware noch ungetestet** |
 | Lokale Modelle mit GPU | 🟡 verdrahtet, auf dem Zielserver zu prüfen |

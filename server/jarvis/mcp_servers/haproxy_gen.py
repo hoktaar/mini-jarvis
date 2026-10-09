@@ -1,15 +1,19 @@
 """Erzeugt die HAProxy-Konfiguration für den Docker-Socket-Proxy aus whitelist.yaml.
 
 Der Proxy erzwingt die Freigaben damit selbst – auch ein kompromittierter Prozess im
-Container kommt nur an die freigegebenen Container und Aktionen.
+Container kommt nur an die freigegebenen Container und Aktionen (nie exec/create).
 
     python -m jarvis.mcp_servers.haproxy_gen /config/whitelist.yaml /etc/haproxy/haproxy.cfg
+    python -m jarvis.mcp_servers.haproxy_gen --watch …   # als root unter supervisord:
+        Änderungen aus der Verwaltung sofort übernehmen und den Proxy neu starten
 """
 
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 from jarvis.mcp_servers.docker_mcp import ACTIONS, load_whitelist
@@ -60,15 +64,43 @@ def render(whitelist: dict[str, set[str]]) -> str:
     return "".join(lines)
 
 
-def main() -> None:
-    src = Path(sys.argv[1] if len(sys.argv) > 1 else "/config/whitelist.yaml")
-    dst = Path(sys.argv[2] if len(sys.argv) > 2 else "/etc/haproxy/haproxy.cfg")
-    wl = load_whitelist(src)
+def write(src: Path, dst: Path) -> bool:
+    """Regeln schreiben; True, wenn sich etwas geändert hat."""
+    try:
+        wl = load_whitelist(src)
+    except Exception as e:  # noqa: BLE001 – kaputte Datei: alte Regeln behalten
+        print(f"Warnung: {src} nicht lesbar, Proxy-Regeln bleiben unverändert: {e}", file=sys.stderr, flush=True)
+        return False
     skipped = [n for n in wl if not NAME_RE.match(n)]
     for n in skipped:
-        print(f"Warnung: ungültiger Containername in der Whitelist übersprungen: {n!r}", file=sys.stderr)
-    dst.write_text(render(wl), encoding="utf-8")
-    print(f"HAProxy-Regeln für {len(wl) - len(skipped)} Container geschrieben: {dst}")
+        print(f"Warnung: ungültiger Containername in der Whitelist übersprungen: {n!r}", file=sys.stderr, flush=True)
+    text = render(wl)
+    if dst.exists() and dst.read_text(encoding="utf-8") == text:
+        return False
+    dst.write_text(text, encoding="utf-8")
+    print(f"HAProxy-Regeln für {len(wl) - len(skipped)} Container geschrieben: {dst}", flush=True)
+    return True
+
+
+def watch(src: Path, dst: Path, interval: float = 2.0) -> None:
+    last = src.stat().st_mtime_ns if src.exists() else None
+    while True:
+        time.sleep(interval)
+        mtime = src.stat().st_mtime_ns if src.exists() else None
+        if mtime == last:
+            continue
+        last = mtime
+        if write(src, dst):
+            subprocess.run(["supervisorctl", "restart", "docker-proxy"], check=False)
+
+
+def main() -> None:
+    args = [a for a in sys.argv[1:] if a != "--watch"]
+    src = Path(args[0] if args else "/config/whitelist.yaml")
+    dst = Path(args[1] if len(args) > 1 else "/etc/haproxy/haproxy.cfg")
+    write(src, dst)
+    if "--watch" in sys.argv:
+        watch(src, dst)
 
 
 if __name__ == "__main__":

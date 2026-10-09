@@ -11,7 +11,8 @@ services:
     environment:
       TZ: Europe/Berlin
       JARVIS_HOSTS: ""  # z. B. 192.168.1.144,server.local – für das Zertifikat
-      # JARVIS_ANTHROPIC_API_KEY: ""    # Cloud-Schlüssel optional hier statt in secrets.yaml
+      # JARVIS_ANTHROPIC_API_KEY: ""    # Cloud-Schlüssel optional hier – einfacher in der Verwaltung → Einstellungen
+      # JARVIS_CONFIG_READONLY: "true"  # Verwaltung zeigt die Einstellungen nur an (Änderungen nur in den Dateien)
     volumes:
       - ./data/config:/config
       - ./data/data:/data

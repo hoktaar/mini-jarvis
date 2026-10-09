@@ -32,6 +32,7 @@ from jarvis.router.router import Router, load_intents
 from jarvis.runner.registry import load_registry
 from jarvis.security.policy import Policy
 from jarvis.session import Services
+from jarvis.settings import scripts_root
 from jarvis.tools.memory import MemoryStore
 from jarvis.tools.setup import RUNNER_SOCKET, build_registry, docker_enabled
 from jarvis.tools.timers import KIND_NAMES, TimerService
@@ -76,11 +77,14 @@ def build_services(config_dir: Path = CONFIG_DIR, data_dir: Path = DATA_DIR, db_
 
     docker_mcp.WHITELIST_FILE = Path(config_dir) / "whitelist.yaml"
     db = Database(db_path or data_dir / "jarvis.db")
+    script_errors: list[str] = []
     try:
-        scripts = load_registry(load_yaml("scripts.yaml", config_dir))
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"Skripte nicht geladen: {e}")
+        scripts = load_registry(load_yaml("scripts.yaml", config_dir), scripts_root(), script_errors)
+    except Exception as e:  # noqa: BLE001 – kaputte Datei darf den Start nicht verhindern
+        script_errors.append(f"scripts.yaml lässt sich nicht lesen: {e}")
         scripts = {}
+    for err in script_errors:
+        logger.warning(f"Skripte: {err}")
 
     services_ref: dict = {}
 
@@ -110,6 +114,7 @@ def build_services(config_dir: Path = CONFIG_DIR, data_dir: Path = DATA_DIR, db_
     services.firmware = FirmwareManager(Path(data_dir), cfg.firmware.auto_update)
     services.warnings = config_warnings(cfg, secrets)
     services.config_dir = config_dir
+    services.script_errors = script_errors
     services.calendar = registry.calendar
     services.feed = Feed()
 

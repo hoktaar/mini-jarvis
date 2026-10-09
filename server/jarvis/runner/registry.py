@@ -33,19 +33,32 @@ class ScriptSpec:
     params: dict[str, ParamSpec] = field(default_factory=dict)
 
 
-def load_registry(data: dict, scripts_root: str = "/scripts") -> dict[str, ScriptSpec]:
+def _spec(sid: str, spec: dict, root: Path) -> ScriptSpec:
+    path = Path(spec["path"]).resolve()
+    if root not in path.parents and path != root:
+        raise ValidationError(f"Skript {sid} liegt außerhalb von {root}")
+    try:
+        params = {name: ParamSpec(**p) for name, p in (spec.get("params") or {}).items()}
+    except TypeError as e:
+        raise ValidationError(f"Skript {sid}: ungültige Parameter ({e})") from e
+    return ScriptSpec(
+        id=sid, path=str(path), description=spec.get("description", ""),
+        confirm=spec.get("confirm", True), car_allowed=spec.get("car_allowed", False),
+        timeout=int(spec.get("timeout", 60)), params=params,
+    )
+
+
+def load_registry(data: dict, scripts_root: str = "/scripts", errors: list[str] | None = None) -> dict[str, ScriptSpec]:
+    """Registry aus scripts.yaml. Mit errors-Liste werden fehlerhafte Einträge übersprungen statt alles abzulehnen."""
     registry: dict[str, ScriptSpec] = {}
     root = Path(scripts_root).resolve()
     for sid, spec in (data.get("scripts") or {}).items():
-        path = Path(spec["path"]).resolve()
-        if root not in path.parents and path != root:
-            raise ValidationError(f"Skript {sid} liegt außerhalb von {root}")
-        params = {name: ParamSpec(**p) for name, p in (spec.get("params") or {}).items()}
-        registry[sid] = ScriptSpec(
-            id=sid, path=str(path), description=spec.get("description", ""),
-            confirm=spec.get("confirm", True), car_allowed=spec.get("car_allowed", False),
-            timeout=int(spec.get("timeout", 60)), params=params,
-        )
+        try:
+            registry[sid] = _spec(sid, spec or {}, root)
+        except (ValidationError, KeyError, ValueError) as e:
+            if errors is None:
+                raise ValidationError(str(e)) from e
+            errors.append(str(e) if not isinstance(e, KeyError) else f"Skript {sid}: Angabe {e} fehlt")
     return registry
 
 

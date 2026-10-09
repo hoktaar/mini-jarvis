@@ -77,6 +77,10 @@ class Services:
     started: float = field(default_factory=time.time)
     config_dir: Any = None
     adapters: list = field(default_factory=list)
+    # Gespeicherte Einstellungen, die erst nach einem Neustart wirken (Verwaltung zeigt einen Hinweis)
+    restart_pending: dict = field(default_factory=lambda: {"core": False, "container": []})
+    ollama_pull: dict | None = None
+    script_errors: list[str] = field(default_factory=list)
 
     def session_for(self, device: Device) -> JarvisSession:
         s = self.sessions.get(device.id)

@@ -40,17 +40,45 @@ async def run_script(registry, sid: str, args: dict) -> dict:
     return {"ok": proc.returncode == 0, "exit_code": proc.returncode, "output": text}
 
 
+class Registry:
+    """scripts.yaml bei jeder Änderung neu einlesen – die Verwaltung schreibt sie."""
+
+    def __init__(self, scripts_file: str, scripts_root: str):
+        self.file, self.root = Path(scripts_file), scripts_root
+        self.mtime: int | None = None
+        self.scripts: dict = {}
+
+    def get(self) -> dict:
+        try:
+            mtime = self.file.stat().st_mtime_ns
+        except OSError:
+            return self.scripts
+        if mtime != self.mtime:
+            self.mtime = mtime
+            try:
+                errors: list[str] = []
+                self.scripts = load_registry(yaml.safe_load(self.file.read_text()) or {}, self.root, errors)
+                for err in errors:
+                    print(f"Runner: übersprungen – {err}", flush=True)
+                print(f"Runner: {len(self.scripts)} Skript(e) freigegeben", flush=True)
+            except Exception as e:  # noqa: BLE001 – kaputte Datei: alte Liste behalten
+                print(f"Runner: scripts.yaml fehlerhaft, alte Liste bleibt aktiv: {e}", flush=True)
+        return self.scripts
+
+
 async def serve(socket_path: str, scripts_file: str, scripts_root: str) -> None:
-    registry = load_registry(yaml.safe_load(Path(scripts_file).read_text()) or {}, scripts_root)
+    registry = Registry(scripts_file, scripts_root)
+    registry.get()
 
     async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
             line = await reader.readline()
             req = json.loads(line or b"{}")
+            scripts = registry.get()
             if req.get("op") == "list":
-                resp = {"ok": True, "scripts": {k: v.description for k, v in registry.items()}}
+                resp = {"ok": True, "scripts": {k: v.description for k, v in scripts.items()}}
             else:
-                resp = await run_script(registry, req.get("id", ""), req.get("args") or {})
+                resp = await run_script(scripts, req.get("id", ""), req.get("args") or {})
         except Exception as e:  # noqa: BLE001
             resp = {"ok": False, "error": f"Runner-Fehler: {e}"}
         writer.write((json.dumps(resp) + "\n").encode())
