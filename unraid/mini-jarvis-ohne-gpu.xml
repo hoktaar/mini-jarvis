@@ -9,13 +9,18 @@
   <Support>https://github.com/hoktaar/mini-jarvis/issues</Support>
   <Project>https://github.com/hoktaar/mini-jarvis</Project>
   <ReadMe>https://github.com/hoktaar/mini-jarvis/blob/main/docs/UNRAID.md</ReadMe>
-  <Overview>Mini-Jarvis – deutschsprachiger Sprachassistent für den eigenen Server. Variante OHNE GPU: Sprachmodell aus der Cloud (Claude, GPT, Gemini …) oder von einem externen Ollama; Spracherkennung per Cloud oder Whisper auf der CPU. Cloud-Dienste optional. Web-Dashboard, Verwaltung, CYD/ESP32-Displays (Firmware per USB aus dem Browser, Updates per WLAN), PWA fürs Handy, Telegram und Matrix, Home Assistant, Kalender, Timer und Wecker. HTTPS auf Port 8443 mit eigener CA (nötig für Mikrofon und USB-Flasher im Browser).</Overview>
+  <Overview>Mini-Jarvis – deutschsprachiger Sprachassistent für den eigenen Server. Variante OHNE GPU: Sprachmodell aus der Cloud (Claude, GPT, Gemini …) oder von einem externen Ollama; Spracherkennung per Cloud oder lokal auf der CPU (Parakeet, Whisper). Cloud-Dienste optional. Web-Dashboard, Verwaltung, CYD/ESP32-Displays (Firmware per USB aus dem Browser, Updates per WLAN), PWA fürs Handy, Telegram und Matrix, Home Assistant, Kalender, Timer und Wecker. HTTPS auf Port 8443 mit eigener CA (nötig für Mikrofon und USB-Flasher im Browser).</Overview>
   <Category>HomeAutomation: Tools: AI:</Category>
   <WebUI>https://[IP]:[PORT:8443]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/unraid/mini-jarvis-ohne-gpu.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/hoktaar/mini-jarvis/main/server/jarvis/web/icons/icon-192.png</Icon>
   <ExtraParams>--stop-timeout=30</ExtraParams>
-  <Changes>### 0.4.0&#xD;
+  <Changes>### 0.5.0&#xD;
+- Parakeet: schnelle deutsche Spracherkennung auf dem Prozessor (lässt die GPU frei)&#xD;
+- Transkriptions-Schnittstelle wie OpenAI (/v1/audio/transcriptions) für Diktier-Apps im Heimnetz&#xD;
+- Whisper weicht bei GPU-Problemen automatisch auf den Prozessor aus&#xD;
+&#xD;
+### 0.4.0&#xD;
 - Alle Einstellungen in der Verwaltung – keine YAML-Dateien mehr bearbeiten&#xD;
 - Neustart von Jarvis per Knopfdruck, Admin-Token im Container-Log&#xD;
 - Skripte, Container-Freigaben und eigene Beispielsätze in der Verwaltung&#xD;
@@ -31,7 +36,7 @@
   <Config Name="Zeitzone" Target="TZ" Default="Europe/Berlin" Mode="" Description="" Type="Variable" Display="always" Required="false">Europe/Berlin</Config>
   <Config Name="Konfiguration" Target="/config" Default="/mnt/user/appdata/mini-jarvis/config" Mode="rw" Description="Einstellungen, Schlüssel und Admin-Token. Die Verwaltung schreibt hier hinein (mit Sicherungen unter backups/)." Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/config</Config>
   <Config Name="Daten" Target="/data" Default="/mnt/user/appdata/mini-jarvis/data" Mode="rw" Description="Datenbank (Geräte, Timer, Gedächtnis, Protokolle), Zertifikate, hochgeladene Firmware." Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/data</Config>
-  <Config Name="Modelle" Target="/models" Default="/mnt/cache/appdata/mini-jarvis/models" Mode="rw" Description="Ollama-, Whisper-, Piper- und Embedding-Modelle (mehrere GB). Am besten auf dem Cache-Pool." Type="Path" Display="always" Required="true">/mnt/cache/appdata/mini-jarvis/models</Config>
+  <Config Name="Modelle" Target="/models" Default="/mnt/cache/appdata/mini-jarvis/models" Mode="rw" Description="Ollama-, Whisper-, Parakeet-, Piper- und Embedding-Modelle (mehrere GB). Am besten auf dem Cache-Pool." Type="Path" Display="always" Required="true">/mnt/cache/appdata/mini-jarvis/models</Config>
   <Config Name="Skripte (nur lesen)" Target="/scripts" Default="/mnt/user/appdata/mini-jarvis/scripts" Mode="ro" Description="Eigene Skripte – freigeben unter Verwaltung → Skripte." Type="Path" Display="always" Required="true">/mnt/user/appdata/mini-jarvis/scripts</Config>
   <Config Name="Docker-Socket (nur für den Filter-Proxy)" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="rw" Description="Optional: Container-Status und Neustart per Sprache – nur für Container, die in der Verwaltung freigegeben sind." Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
   <Config Name="Eingebettetes Ollama" Target="JARVIS_EMBEDDED_OLLAMA" Default="false" Mode="" Description="auto = starten, wenn in den Einstellungen das eingebaute Ollama gewählt ist; false = externes Ollama oder nur Cloud." Type="Variable" Display="advanced" Required="false">false</Config>

@@ -69,6 +69,10 @@ def preload(cfg: JarvisConfig) -> None:
         if cfg.providers.stt.type == "whisper":
             device, compute = whisper_device(cfg)
             get_whisper_model(cfg.providers.stt.model, device, compute)
+        if cfg.providers.stt.type == "parakeet":
+            from jarvis import parakeet
+
+            parakeet.get_recognizer(cfg.providers.stt.threads)
         if cfg.providers.tts.type == "piper":
             _patch_piper_cache()
             make_tts(cfg, {})
@@ -76,22 +80,60 @@ def preload(cfg: JarvisConfig) -> None:
         logger.warning(f"Modelle konnten nicht vorgeladen werden: {e}")
 
 
-def transcribe_pcm(cfg: JarvisConfig, pcm16: bytes) -> str:
-    """Sprachnachricht (16 kHz PCM16 mono) mit dem geteilten Whisper transkribieren."""
+MIN_SPEECH_S = 0.3      # kürzer ist ein Fehlauslöser – gar nicht erst erkennen
+
+
+def transcribe_float(cfg: JarvisConfig, audio: np.ndarray) -> str:
+    """16-kHz-Mono-Audio (float32) mit der lokalen Spracherkennung (Whisper oder Parakeet) transkribieren."""
+    if len(audio) < MIN_SPEECH_S * 16000:
+        return ""
+    s = cfg.providers.stt
+    if s.type == "parakeet":
+        from jarvis import parakeet
+
+        return parakeet.transcribe(audio, s.threads)
     device, compute = whisper_device(cfg)
-    model = get_whisper_model(cfg.providers.stt.model, device, compute)
-    audio = np.frombuffer(pcm16, dtype=np.int16).astype(np.float32) / 32768.0
+    model = get_whisper_model(s.model, device, compute)
     segments, _ = model.transcribe(audio, language="de")
-    return " ".join(s.text.strip() for s in segments).strip()
+    return " ".join(seg.text.strip() for seg in segments).strip()
+
+
+def transcribe_pcm(cfg: JarvisConfig, pcm16: bytes) -> str:
+    """Sprachnachricht (16 kHz PCM16 mono) mit der geteilten lokalen Spracherkennung transkribieren."""
+    return transcribe_float(cfg, np.frombuffer(pcm16, dtype=np.int16).astype(np.float32) / 32768.0)
+
+
+class AudioFormatError(ValueError):
+    pass
+
+
+def decode_audio(data: bytes) -> np.ndarray:
+    """Audiodatei (WAV, FLAC, OGG/Opus, MP3) in 16-kHz-Mono float32 umwandeln."""
+    import io
+
+    import soundfile as sf
+    import soxr
+
+    try:
+        audio, rate = sf.read(io.BytesIO(data), dtype="float32", always_2d=True)
+    except Exception as e:  # noqa: BLE001 – soundfile wirft je nach Format verschiedene Fehler
+        raise AudioFormatError("Audioformat nicht lesbar – bitte WAV, FLAC, OGG oder MP3 senden.") from e
+    mono = audio.mean(axis=1)
+    if rate != 16000:
+        mono = soxr.resample(mono, rate, 16000)
+    return np.clip(mono, -1, 1).astype(np.float32)
+
+
+LOCAL_TRANSCRIBE = ("whisper", "parakeet")
+REMOTE_TRANSCRIBE = ("openai", "groq")
 
 
 async def transcribe_audio(cfg: JarvisConfig, secrets: dict, data: bytes, filename: str = "audio.ogg") -> str:
-    """Sprachnachricht (z. B. Telegram-OGG) transkribieren: lokal mit Whisper oder über OpenAI/Groq."""
+    """Audiodatei (z. B. Telegram-OGG) transkribieren: lokal mit Whisper/Parakeet oder über OpenAI/Groq."""
     import asyncio
-    import io
 
     s = cfg.providers.stt
-    if s.type in ("openai", "groq"):
+    if s.type in REMOTE_TRANSCRIBE:
         import httpx
 
         base = s.base_url or ("https://api.groq.com/openai/v1" if s.type == "groq" else "https://api.openai.com/v1")
@@ -102,21 +144,10 @@ async def transcribe_audio(cfg: JarvisConfig, secrets: dict, data: bytes, filena
                                   data={"model": model, "language": "de"}, files={"file": (filename, data)})
             r.raise_for_status()
             return (r.json().get("text") or "").strip()
-    if s.type not in ("whisper", "none"):
-        raise RuntimeError("Sprachnachrichten brauchen Whisper, OpenAI oder Groq als Spracherkennung.")
-
-    def _decode() -> bytes:
-        import soundfile as sf
-        import soxr
-
-        audio, rate = sf.read(io.BytesIO(data), dtype="float32", always_2d=True)
-        mono = audio.mean(axis=1)
-        if rate != 16000:
-            mono = soxr.resample(mono, rate, 16000)
-        return (np.clip(mono, -1, 1) * 32767).astype("<i2").tobytes()
-
-    pcm = await asyncio.to_thread(_decode)
-    return await asyncio.to_thread(transcribe_pcm, cfg, pcm)
+    if s.type not in (*LOCAL_TRANSCRIBE, "none"):
+        raise RuntimeError("Sprachnachrichten brauchen Whisper, Parakeet, OpenAI oder Groq als Spracherkennung.")
+    audio = await asyncio.to_thread(decode_audio, data)
+    return await asyncio.to_thread(transcribe_float, cfg, audio)
 
 
 def _patch_piper_cache() -> None:
@@ -206,6 +237,8 @@ def make_stt(cfg: JarvisConfig, secrets: dict, hotwords: list[str] | None = None
             ),
             device=device, compute_type=compute,
         )
+    if s.type == "parakeet":
+        return _parakeet_stt(s.threads)
     prompt = "Jarvis, " + ", ".join(hotwords or [])
     key = _key(secrets, "google_stt" if s.type == "google" else s.type, s.api_key_secret)
     if s.type == "openai":
@@ -243,6 +276,45 @@ def make_stt(cfg: JarvisConfig, secrets: dict, hotwords: list[str] | None = None
                                     settings=_settings(ElevenLabsSTTService, model=s.model or None,
                                                        language=Language.DE))
     raise ValueError(f"STT-Typ nicht unterstützt: {s.type}")
+
+
+def _parakeet_stt(threads: int):
+    import asyncio
+
+    from pipecat.frames.frames import ErrorFrame, TranscriptionFrame
+    from pipecat.services.settings import STTSettings
+    from pipecat.services.stt_service import SegmentedSTTService
+    from pipecat.transcriptions.language import Language
+    from pipecat.utils.time import time_now_iso8601
+
+    from jarvis import parakeet
+
+    class ParakeetSTTService(SegmentedSTTService):
+        """Parakeet über sherpa-onnx; das Modell teilen sich alle Sitzungen (siehe jarvis.parakeet)."""
+
+        @property
+        def wants_wav_segments(self) -> bool:
+            return False
+
+        def can_generate_metrics(self) -> bool:
+            return True
+
+        async def run_stt(self, audio: bytes):
+            await self.start_processing_metrics()
+            pcm = np.frombuffer(audio, dtype=np.int16).astype(np.float32) / 32768.0
+            try:
+                text = await asyncio.to_thread(parakeet.transcribe, pcm, threads)
+            except Exception as e:  # noqa: BLE001
+                logger.error(f"Parakeet: {e}")
+                yield ErrorFrame(f"Parakeet: {e}")
+                return
+            finally:
+                await self.stop_processing_metrics()
+            if text:
+                logger.debug(f"Transkript: [{text}]")
+                yield TranscriptionFrame(text, self._user_id, time_now_iso8601(), Language.DE)
+
+    return ParakeetSTTService(settings=STTSettings(model="parakeet-primeline", language=Language.DE))
 
 
 def make_tts(cfg: JarvisConfig, secrets: dict):

@@ -15,6 +15,10 @@ const S = {
   haFilter: "",
   ollama: null,        // installierte Modelle
   ollamaLoading: false,
+  parakeet: null,      // Status des Parakeet-Modells
+  parakeetTimer: null,
+  api: null,           // Transkriptions-Schnittstelle (Adresse, Token)
+  apiShow: false,
   pullTimer: null,
   geo: null,
 };
@@ -66,7 +70,7 @@ const CLOUD_MODELS = {
   openrouter: ["anthropic/claude-sonnet-5.5", "openai/gpt-5-mini", "google/gemini-2.5-flash"], deepseek: ["deepseek-chat"],
 };
 const STT_TYPES = [
-  ["whisper", "Whisper – lokal"], ["openai", "OpenAI · Cloud"], ["groq", "Groq · Cloud"], ["deepgram", "Deepgram · Cloud"],
+  ["whisper", "Whisper – lokal"], ["parakeet", "Parakeet – lokal, Prozessor"], ["openai", "OpenAI · Cloud"], ["groq", "Groq · Cloud"], ["deepgram", "Deepgram · Cloud"],
   ["azure", "Azure · Cloud"], ["google", "Google · Cloud"], ["elevenlabs", "ElevenLabs · Cloud"], ["none", "Aus (nur Text)"],
 ];
 const STT_MODELS = {
@@ -91,7 +95,7 @@ const EMBEDDED_OLLAMA = "http://127.0.0.1:11434/v1";
 const RISKS = [["read", "Lesen", "Wetter, Suche, Kalender ansehen"], ["write", "Schreiben", "Timer, Licht, Termine anlegen"],
   ["critical", "Kritisch", "Container steuern, Skripte ausführen"]];
 
-const sttCloud = () => !["whisper", "none"].includes(get("providers.stt.type"));
+const sttCloud = () => !["whisper", "parakeet", "none"].includes(get("providers.stt.type"));
 const ttsCloud = () => !["piper", "none"].includes(get("providers.tts.type"));
 
 const SECTIONS = [
@@ -153,17 +157,23 @@ const SECTIONS = [
     ],
   },
   {
-    id: "voice", title: "Sprache", icon: "i-mic", prefixes: ["providers.stt", "providers.tts", "audio"],
+    id: "voice", title: "Sprache", icon: "i-mic", prefixes: ["providers.stt", "providers.tts", "audio", "server.transcription_api"],
     intro: "Hören, sprechen und das Aktivierungswort.",
     groups: [
       { title: "Spracherkennung (hören)", fields: [
         SEL("providers.stt.type", "Dienst", STT_TYPES),
-        T("providers.stt.model", "Modell", { when: () => get("providers.stt.type") !== "none", suggest: () => STT_MODELS[get("providers.stt.type")] || [] }),
+        CUSTOM(parakeetModel, { when: is("providers.stt.type", "parakeet") }),
+        N("providers.stt.threads", "CPU-Threads", { when: is("providers.stt.type", "parakeet"), advanced: true, min: 1, max: 16, help: "4 reicht meist – mehr bringt kaum etwas und bremst den Rest des Servers." }),
+        T("providers.stt.model", "Modell", { when: () => !["none", "parakeet"].includes(get("providers.stt.type")), suggest: () => STT_MODELS[get("providers.stt.type")] || [] }),
         SEL("providers.stt.device", "Rechnet auf", [["cuda", "Grafikkarte (CUDA)"], ["cpu", "Prozessor"]], { when: is("providers.stt.type", "whisper") }),
         T("providers.stt.compute_type", "Genauigkeit", { when: is("providers.stt.type", "whisper"), advanced: true, suggest: () => ["int8_float16", "float16", "int8"] }),
         T("providers.stt.base_url", "Eigene Adresse", { when: is("providers.stt.type", "openai"), advanced: true, placeholder: "leer = OpenAI" }),
         T("providers.stt.region", "Region", { when: is("providers.stt.type", "azure"), placeholder: "westeurope" }),
         SECRET(() => providerSecret(get("providers.stt.type") === "google" ? "google_stt" : get("providers.stt.type"), get("providers.stt.api_key_secret")), "API-Schlüssel", { when: sttCloud, multiline: () => get("providers.stt.type") === "google" }),
+      ] },
+      { title: "Schnittstelle für andere Programme", fields: [
+        B("server.transcription_api", "Transkriptions-Schnittstelle", { help: "Diktier-Apps und andere Geräte im Heimnetz nutzen Jarvis' Spracherkennung mit – wie die OpenAI-Schnittstelle /v1/audio/transcriptions. Wirkt sofort." }),
+        CUSTOM(transcriptionApi, { when: on("server.transcription_api") }),
       ] },
       { title: "Sprachausgabe (sprechen)", fields: [
         SEL("providers.tts.type", "Dienst", TTS_TYPES),
@@ -615,6 +625,84 @@ function ollamaModel() {
   }
   return row("Modell", "Größere Modelle antworten besser, brauchen aber mehr Grafikspeicher (8B ≈ 6 GB).",
     el("div", { class: "stack-s" }, input, datalist(`${fid(path)}-list`, [...new Set([...installed, ...OLLAMA_SUGGEST])]), ...info), { path });
+}
+
+async function loadParakeet() {
+  try { S.parakeet = await ctx.api("/api/admin/parakeet"); } catch (e) { S.parakeet = { error: e.message }; }
+  if (S.parakeet.downloading) pollParakeet();
+  if (S.section === "voice") render();
+}
+
+function pollParakeet() {
+  clearTimeout(S.parakeetTimer);
+  S.parakeetTimer = setTimeout(async () => {
+    const before = S.parakeet;
+    await loadParakeet();
+    if (before?.downloading && !S.parakeet.downloading) toast(S.parakeet.installed ? "Parakeet-Modell ist bereit." : `Download fehlgeschlagen: ${S.parakeet.error}`);
+  }, 1500);
+}
+
+function parakeetModel() {
+  if (!S.parakeet) { S.parakeet = { loading: true }; loadParakeet(); }
+  const p = S.parakeet;
+  const parts = [el("p", { class: "muted small" }, "Deutsches Modell „parakeet-primeline“ (NVIDIA Parakeet TDT 0.6B, angepasst von primeline, CC-BY-4.0). Läuft schnell auf dem Prozessor und lässt die Grafikkarte frei für das Sprachmodell.")];
+  if (p.loading) parts.push(el("p", { class: "muted small" }, "Prüfe das Modell …"));
+  else if (p.downloading) {
+    const pct = Math.round((p.progress || 0) * 100);
+    parts.push(el("div", { class: "progress" }, el("div", { class: "label" }, el("span", {}, "Parakeet wird geladen"), el("span", {}, `${pct} %`)),
+      el("div", { class: "track" }, el("div", { class: "fill", style: `width:${pct}%` }))));
+  } else if (p.installed) {
+    parts.push(el("span", { class: "st ok" }, p.loaded ? "Modell geladen und bereit" : "Modell vorhanden – wird beim nächsten Start geladen"));
+  } else {
+    if (p.error) parts.push(el("p", { class: "set-note warn" }, icon("i-warn"), p.error));
+    parts.push(el("p", { class: "set-note" }, icon("i-help"), `Das Modell (~${p.size_mb || 670} MB) fehlt noch. Jarvis lädt es sonst beim Start selbst.`,
+      el("button", {
+        type: "button", class: "btn small primary", onclick: async () => {
+          try { S.parakeet = await ctx.api("/api/admin/parakeet/download", { method: "POST" }); pollParakeet(); render(); } catch (e) { toast(e.message); }
+        },
+      }, icon("i-download"), "Jetzt herunterladen")));
+  }
+  return row("Modell", null, el("div", { class: "stack-s" }, ...parts), { wide: true });
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast("Kopiert"); } catch { toast("Kopieren nicht möglich – bitte markieren."); }
+}
+
+async function loadApi() {
+  try { S.api = await ctx.api("/api/admin/transcription"); } catch (e) { S.api = { error: e.message }; }
+  if (S.section === "voice") render();
+}
+
+function transcriptionApi() {
+  if (!S.api) { S.api = { loading: true }; loadApi(); }
+  const a = S.api;
+  if (a.loading) return row("Zugang", null, el("p", { class: "muted small" }, "Lade …"));
+  const host = location.hostname;
+  const httpPort = get("server.port") || 8080;
+  const base = `http://${host}:${httpPort}/v1`;
+  const rows = [];
+  rows.push(row("Adresse", "Im Heimnetz über HTTP. Über HTTPS geht es auch – dann muss das Programm der Jarvis-CA vertrauen.",
+    el("div", { class: "inline-row" }, el("code", { class: "copyable" }, base), el("button", { type: "button", class: "btn small", onclick: () => copyText(base) }, "Kopieren"))));
+  const regen = el("button", {
+    type: "button", class: "btn small", disabled: a.token_env || null, onclick: async () => {
+      if (a.token && !confirm("Neuen Token erzeugen? Programme mit dem alten Token müssen umgestellt werden.")) return;
+      try { S.api = await ctx.api("/api/admin/transcription/token", { method: "POST" }); S.apiShow = true; render(); } catch (e) { toast(e.message); }
+    },
+  }, icon("i-refresh"), a.token ? "Neu erzeugen" : "Token erzeugen");
+  const tokenView = a.token
+    ? el("div", { class: "inline-row" }, el("code", { class: "copyable" }, S.apiShow ? a.token : "•".repeat(16)),
+      el("button", { type: "button", class: "btn small", onclick: () => { S.apiShow = !S.apiShow; render(); } }, S.apiShow ? "Verbergen" : "Anzeigen"),
+      el("button", { type: "button", class: "btn small", onclick: () => copyText(a.token) }, "Kopieren"), regen)
+    : el("div", { class: "inline-row" }, el("span", { class: "muted small" }, "Noch kein Token – Geräte-Tokens gekoppelter Geräte gehen auch."), regen);
+  rows.push(row("Token", a.token_env ? "Kommt aus JARVIS_TRANSCRIPTION_API_TOKEN (Container-Vorlage)." : "Als „Bearer“-Token bzw. API-Schlüssel im Programm eintragen.", tokenView));
+  const engine = get("providers.stt.type");
+  if (!["parakeet", "whisper", "openai", "groq"].includes(engine)) {
+    rows.push(el("p", { class: "set-note warn" }, icon("i-warn"), "Die gewählte Spracherkennung kann keine Dateien umwandeln – für die Schnittstelle Parakeet, Whisper, OpenAI oder Groq wählen."));
+  }
+  rows.push(el("details", { class: "set-details" }, el("summary", {}, "Beispiel zum Ausprobieren"),
+    el("pre", { class: "code" }, `curl ${base}/audio/transcriptions \\\n  -H "Authorization: Bearer ${S.apiShow && a.token ? a.token : "DEIN_TOKEN"}" \\\n  -F file=@aufnahme.wav -F model=${engine}`)));
+  return rows;
 }
 
 function feedsEditor() {

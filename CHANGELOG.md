@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 – Parakeet und Transkriptions-Schnittstelle
+
+**Spracherkennung**
+- Neu: **Parakeet** (parakeet-primeline, deutsches Fine-Tuning von NVIDIA Parakeet TDT 0.6B) über sherpa-onnx –
+  läuft schnell auf dem Prozessor und lässt die Grafikkarte ganz für das Sprachmodell frei. Auswahl, Modell-Download
+  mit Fortschritt und CPU-Threads unter **Einstellungen → Sprache**; ohne Download lädt Jarvis das Modell beim Start.
+- Lange Aufnahmen werden an Pausen geteilt, leise Aufnahmen angehoben, sehr kurze (< 0,3 s) als Fehlauslöser
+  verworfen – nach dem Vorbild von [dictate](https://github.com/winidi/dictate).
+- Whisper weicht bei CUDA-Fehlern (Treiber zu alt, Container ohne GPU-Zugriff) auf den Prozessor aus und zeigt einen
+  Hinweis in der Übersicht.
+
+**Transkriptions-Schnittstelle**
+- `POST /v1/audio/transcriptions` und `GET /v1/models` im Format der OpenAI-Schnittstelle: Diktier-Apps und andere
+  Geräte im Heimnetz nutzen Jarvis' Spracherkennung mit. Standardmäßig aus; Schalter, Adresse und Token (erzeugen,
+  anzeigen, kopieren) unter **Einstellungen → Sprache**. Gekoppelte Geräte dürfen mit ihrem Geräte-Token.
+- Sprachnachrichten (Telegram, Matrix) gehen jetzt auch mit Parakeet.
+
 ## 0.4.0 – Einstellungen ohne YAML
 
 **Verwaltung → Einstellungen** (neu)

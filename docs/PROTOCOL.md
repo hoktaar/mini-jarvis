@@ -80,10 +80,14 @@ WLAN-Zugangsdaten gehen dabei nur über USB an das Gerät.
 | GET | `/api/dashboard` | Gerät | alles fürs Dashboard (Wetter, Geräte, Systemwerte, Aufgaben, Feed, Smarthome) |
 | POST | `/api/home/{entity}/toggle` | Gerät | Kachel schalten |
 | GET | `/api/firmware/{variante}/{datei}.bin` | Gerät oder Admin | OTA und Web-Flasher |
+| POST | `/v1/audio/transcriptions` | Schnittstellen- oder Geräte-Token | wie OpenAI: Multipart mit `file` (WAV, FLAC, OGG, MP3, ≤ 25 MB), optional `model`, `language=de`, `response_format` (`json`, `text`, `verbose_json`); nur wenn in der Verwaltung eingeschaltet (sonst 404). Fehler im OpenAI-Format `{"error": {"message", "type"}}` |
+| GET | `/v1/models` | Schnittstellen- oder Geräte-Token | die eingestellte Spracherkennung als Modell-ID |
 | * | `/api/admin/*` | Admin | Übersicht, Geräte (+ `rotate`, `ota`), Firmware (+ `upload`, `manifest`), Router (`router-log`, `correct`, `test`, `eval`, `retrain`), Absichten (+ eigene Beispielsätze), Gedächtnis, Skripte (+ `run`, anlegen/ändern/entfernen, `script-files`), Timer, Protokoll, `reload`, `provision-info` |
 | GET/PUT | `/api/admin/settings` | Admin | Einstellungen lesen (Schlüssel nur als „gesetzt“) bzw. ändern: `{"changes": {"pfad.zum.wert": …}, "secrets": {"name": "…"}, "whitelist": {"container": ["status", …]}}` – Fehler je Feld als `detail.errors` |
 | POST | `/api/admin/restart` | Admin | Jarvis neu starten (gleicher Prozess, liest die Einstellungen neu); `/api/health` liefert danach ein neues `boot` |
 | POST | `/api/admin/token/rotate` | Admin | neuen Admin-Token erzeugen |
+| GET/POST | `/api/admin/parakeet`, `/api/admin/parakeet/download` | Admin | Parakeet-Modell: Status bzw. Download starten (Fortschritt per GET) |
+| GET/POST | `/api/admin/transcription`, `/api/admin/transcription/token` | Admin | Transkriptions-Schnittstelle: Adresse/Token anzeigen bzw. neuen Token erzeugen |
 | GET/POST | `/api/admin/ollama`, `/api/admin/ollama/pull` | Admin | Modelle des (lokalen) Ollama anzeigen bzw. herunterladen (Fortschritt per GET) |
 | POST | `/api/admin/homeassistant/test` | Admin | Verbindung prüfen und Entitäten zur Auswahl laden |
 | GET | `/api/admin/geocode?q=` | Admin | Ortssuche (Open-Meteo) für den Standort |

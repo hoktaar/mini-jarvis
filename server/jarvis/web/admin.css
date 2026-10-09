@@ -347,3 +347,10 @@ body:has(#set-bar:not([hidden])) .toast { bottom: calc(7rem + env(safe-area-inse
   .obj-line > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
   .set-bar { bottom: 0; }
 }
+
+/* Transkriptions-Schnittstelle: Adresse, Token, Beispiel */
+.set-details { margin: .4rem 0 0; font-size: .86rem; color: var(--ink-2); }
+.set-details summary { cursor: pointer; color: var(--accent); }
+.set-details pre.code { margin: .5rem 0 0; padding: .6rem; overflow-x: auto; border-radius: var(--radius-s); background: rgba(2, 8, 18, .7); border: 1px solid var(--line); font: .78rem/1.45 ui-monospace, monospace; color: #9fd3ff; white-space: pre; }
+:root[data-theme="light"] .set-details pre.code { background: #0c1d33; }
+code.copyable { padding: .25rem .45rem; border-radius: var(--radius-s); background: var(--panel-2); border: 1px solid var(--line); user-select: all; }

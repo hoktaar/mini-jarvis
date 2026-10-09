@@ -310,7 +310,7 @@ async function loadOverview() {
   // Anbieter
   const p = ov.providers;
   const def = (k, v, cloud = false) => [el("dt", {}, k), el("dd", {}, cloud ? el("span", { class: "chip-s cloud" }, icon("i-cloud"), v) : v)];
-  const isCloud = (type) => !["whisper", "piper", "none", "searxng", "aus"].includes(String(type).split(" ")[0]);
+  const isCloud = (type) => !["whisper", "parakeet", "piper", "none", "searxng", "aus"].includes(String(type).split(" ")[0]);
   $("ov-providers").replaceChildren(
     ...def("Sprachmodell", p.llm_primary === "cloud" ? "Cloud zuerst, lokal als Ausfall" : "Lokal zuerst"),
     ...def("Lokal", p.llm_local),

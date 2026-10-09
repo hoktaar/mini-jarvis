@@ -52,7 +52,7 @@ Ein Container für Unraid oder Docker, dazu kleine Touch-Displays (CYD/ESP32) f�
 | ⚡ **Schnellweg** | Uhrzeit, Timer, Wecker, Erinnerungen, Wetter, Lautstärke, Privatmodus … ohne Sprachmodell, Entscheidung in Millisekunden |
 | 🧰 **Werkzeuge** | Websuche (SearXNG, Brave, Tavily), Nachrichten (RSS), Kalender (CalDAV), Gedächtnis („Merk dir …“), Home Assistant, Docker-Container, eigene Skripte |
 | 🧠 **Modelle** | lokal (Ollama, Whisper, Piper) **oder** Cloud: Anthropic, OpenAI, Google, Mistral, Groq, OpenRouter, DeepSeek, OpenAI-kompatibel |
-| 🔊 **Stimme** | Spracherkennung: Whisper, OpenAI, Groq, Deepgram, Azure, Google, ElevenLabs · Sprachausgabe: Piper, OpenAI, ElevenLabs, Cartesia, Deepgram, Azure, Google |
+| 🔊 **Stimme** | Spracherkennung: Whisper, Parakeet (schnell auf dem Prozessor), OpenAI, Groq, Deepgram, Azure, Google, ElevenLabs · Sprachausgabe: Piper, OpenAI, ElevenLabs, Cartesia, Deepgram, Azure, Google |
 | 🔁 **Ausfallsicher** | Lokal oder Cloud als Standard, der andere Weg springt bei Fehlern ein; Budget pro Tag/Monat |
 | 🔒 **Sicher** | Rückfrage bei kritischen Aktionen, Schutz vor Prompt-Injection aus Webinhalten, Geräte-Tokens, HTTPS mit eigener CA, Privatmodus pro Gerät |
 | 🖥️ **Oberflächen** | HUD-Dashboard (Desktop, Tablet, Handy, hell/dunkel), Verwaltung mit allen Einstellungen (ohne YAML), CYD-Display mit Licht- und Musikseiten |
@@ -287,15 +287,38 @@ Beispielsätze und Container-Freigaben wirken sofort.
 | | Sprachmodell | Spracherkennung / -ausgabe |
 |---|---|---|
 | **Alles lokal** (GPU) | Lokal zuerst, Ollama eingebaut, `qwen3:8b` | Whisper (Grafikkarte) / Piper |
-| **Ohne GPU** | Cloud zuerst (z. B. Anthropic), lokales Modell aus | Whisper „small“ auf dem Prozessor oder Cloud / Piper |
+| **Ohne GPU** | Cloud zuerst (z. B. Anthropic), lokales Modell aus | Parakeet auf dem Prozessor oder Cloud / Piper |
+| **GPU nur fürs Sprachmodell** | Lokal zuerst, größeres Modell | Parakeet auf dem Prozessor / Piper – die ganze Grafikkarte bleibt für Ollama |
 | **Lokal mit Rückfallebene** | Lokal zuerst + Cloud-Modell „bei Ausfall einspringen“ | wie oben |
 
 | Rolle | Anbieter |
 |---|---|
 | Sprachmodell | Anthropic · OpenAI · Google · Mistral · Groq · OpenRouter · DeepSeek · OpenAI-kompatibel (eigene Adresse) |
-| Spracherkennung | Whisper (lokal) · OpenAI · Groq · Deepgram · Azure · Google · ElevenLabs |
+| Spracherkennung | Whisper (lokal) · Parakeet (lokal, Prozessor) · OpenAI · Groq · Deepgram · Azure · Google · ElevenLabs |
 | Sprachausgabe | Piper (lokal) · OpenAI · ElevenLabs · Cartesia · Deepgram · Azure · Google |
 | Websuche | SearXNG (eingebaut) · Brave · Tavily |
+
+**Parakeet** ist ein deutsches Spracherkennungsmodell (NVIDIA Parakeet TDT 0.6B, angepasst von primeline), das
+auf dem Prozessor läuft – etwa 0,1 s für einen kurzen Satz, ohne Grafikspeicher. Das Modell (~670 MB) lädt Jarvis
+beim ersten Start selbst oder per Knopf unter **Einstellungen → Sprache**.
+
+### Transkriptions-Schnittstelle für andere Programme
+
+Unter **Einstellungen → Sprache → Schnittstelle für andere Programme** lässt sich Jarvis' Spracherkennung für
+andere Geräte im Heimnetz freigeben – im Format der OpenAI-Schnittstelle (`POST /v1/audio/transcriptions`).
+Damit können Diktier-Apps wie [dictate](https://github.com/winidi/dictate) oder eigene Skripte das Modell auf dem
+Server mitbenutzen, statt selbst eines mitzubringen.
+
+- Schalter an, **Token erzeugen**, Adresse und Token ins Programm eintragen (Adresse: `http://<server>:8080/v1`).
+- Es gilt die eingestellte Spracherkennung (Parakeet, Whisper, OpenAI oder Groq); Sprache ist Deutsch.
+- Formate: WAV, FLAC, OGG/Opus, MP3 bis 25 MB; Antwort `json`, `text` oder `verbose_json`.
+- Statt des Schnittstellen-Tokens geht auch der Token eines gekoppelten Geräts.
+
+```bash
+curl http://192.168.1.10:8080/v1/audio/transcriptions \
+  -H "Authorization: Bearer jt_…" -F file=@aufnahme.wav -F model=parakeet
+# {"text": "Mach das Licht im Wohnzimmer an"}
+```
 
 <details>
 <summary>Für Fortgeschrittene: die Dateien dahinter</summary>
@@ -399,6 +422,8 @@ veröffentlicht es unter `ghcr.io/hoktaar/mini-jarvis`.
 
 Jarvis steht auf den Schultern von [Pipecat](https://github.com/pipecat-ai/pipecat),
 [Ollama](https://ollama.com), [faster-whisper](https://github.com/SYSTRAN/faster-whisper),
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) mit [parakeet-primeline](https://huggingface.co/flozen1981/parakeet-primeline-onnx)
+(CC-BY-4.0, primeline und NVIDIA; Aufteilen langer Aufnahmen nach dem Vorbild von [dictate](https://github.com/winidi/dictate)),
 [Piper](https://github.com/rhasspy/piper), [openWakeWord](https://github.com/dscripka/openWakeWord),
 [SearXNG](https://github.com/searxng/searxng), [LovyanGFX](https://github.com/lovyan03/LovyanGFX) und
 [esptool-js](https://github.com/espressif/esptool-js).

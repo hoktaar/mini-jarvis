@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mini-jarvis"
-version = "0.4.0"
+version = "0.5.0"
 description = "Lokaler Sprachassistent auf Basis von Pipecat"
 requires-python = ">=3.11"
 dependencies = [
@@ -30,6 +30,9 @@ dependencies = [
 gpu = [
   "pipecat-ai[whisper,piper]==1.12.*",
   "sentence-transformers>=3",
+  # Parakeet (deutsche Spracherkennung auf der CPU) über sherpa-onnx; Modell von Hugging Face
+  "sherpa-onnx>=1.12",
+  "huggingface_hub>=0.23",
 ]
 # Cloud-Anbieter: LLM (Anthropic, OpenAI & kompatible, Google, Mistral, Groq), Sprache (Deepgram, Azure, Google)
 cloud = ["pipecat-ai[anthropic,openai,google,mistral,groq,deepgram,azure,jev]==1.12.*"]
